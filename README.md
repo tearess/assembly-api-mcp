@@ -20,8 +20,8 @@ Claude, ChatGPT 등 AI 도구에서 국회의원, 의안, 일정, 회의록, 위
 
 ```bash
 # 1. 설치
-git clone https://github.com/jonghongjeon/cong.git
-cd cong
+git clone https://github.com/hollobit/assembly-api-mcp.git
+cd assembly-api-mcp
 npm install && npm run build
 
 # 2. API 키 설정
@@ -39,9 +39,9 @@ npx tsx src/cli.ts test
 ```json
 {
   "mcpServers": {
-    "cong": {
+    "assembly-api": {
       "command": "node",
-      "args": ["/absolute/path/to/cong/dist/index.js"],
+      "args": ["/absolute/path/to/assembly-api/dist/index.js"],
       "env": {
         "ASSEMBLY_API_KEY": "your-api-key-here",
         "MCP_PROFILE": "lite"
@@ -180,7 +180,7 @@ npx tsx src/cli.ts test
 ## 프로젝트 구조
 
 ```
-cong/
+assembly-api/
 ├── src/
 │   ├── index.ts              # MCP 서버 진입점
 │   ├── server.ts             # McpServer 초기화 (stdio/HTTP)

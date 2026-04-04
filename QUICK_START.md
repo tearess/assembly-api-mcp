@@ -19,8 +19,8 @@
 
 ```bash
 # 프로젝트 클론
-git clone https://github.com/jonghongjeon/cong.git
-cd cong
+git clone https://github.com/hollobit/assembly-api-mcp.git
+cd assembly-api-mcp
 
 # 의존성 설치 및 빌드
 npm install
@@ -69,9 +69,9 @@ npx tsx src/cli.ts test
 ```json
 {
   "mcpServers": {
-    "cong": {
+    "assembly-api": {
       "command": "node",
-      "args": ["/Users/YOUR_USERNAME/git/cong/dist/index.js"],
+      "args": ["/Users/YOUR_USERNAME/git/assembly-api/dist/index.js"],
       "env": {
         "ASSEMBLY_API_KEY": "여기에_발급받은_키_입력"
       }
@@ -87,9 +87,9 @@ npx tsx src/cli.ts test
 ```json
 {
   "mcpServers": {
-    "cong": {
+    "assembly-api": {
       "command": "node",
-      "args": ["C:\\Users\\YOUR_USERNAME\\git\\cong\\dist\\index.js"],
+      "args": ["C:\\Users\\YOUR_USERNAME\\git\\assembly-api\\dist\\index.js"],
       "env": {
         "ASSEMBLY_API_KEY": "여기에_발급받은_키_입력"
       }

@@ -5,8 +5,8 @@
 ## 개발 환경 설정
 
 ```bash
-git clone https://github.com/jonghongjeon/cong.git
-cd cong
+git clone https://github.com/hollobit/assembly-api-mcp.git
+cd assembly-api-mcp
 npm install
 cp .env.example .env
 # .env에 ASSEMBLY_API_KEY 입력 (https://open.assembly.go.kr 에서 발급)
