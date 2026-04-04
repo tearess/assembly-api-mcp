@@ -1,0 +1,166 @@
+/**
+ * Lite 국회의원 통합 검색 도구
+ *
+ * get_members + get_member_detail을 하나의 search_members로 통합.
+ * 이름 검색 결과가 1건이면 자동으로 전체 상세 정보를 반환합니다.
+ */
+
+import { z } from "zod";
+import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { type AppConfig } from "../../config.js";
+import { createApiClient } from "../../api/client.js";
+import { API_CODES } from "../../api/codes.js";
+
+// ---------------------------------------------------------------------------
+// Field mappings
+// ---------------------------------------------------------------------------
+
+/** 목록용 요약 필드 */
+const SUMMARY_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ["HG_NM", "이름"],
+  ["POLY_NM", "정당"],
+  ["ORIG_NM", "선거구"],
+  ["REELE_GBN_NM", "당선횟수"],
+  ["ELECT_GBN_NM", "당선방법"],
+  ["CMITS", "소속위원회"],
+] as const;
+
+/** 상세용 전체 필드 */
+const DETAIL_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ["HG_NM", "이름"],
+  ["HJ_NM", "한자"],
+  ["ENG_NM", "영문"],
+  ["POLY_NM", "정당"],
+  ["ORIG_NM", "선거구"],
+  ["REELE_GBN_NM", "당선횟수"],
+  ["ELECT_GBN_NM", "당선방법"],
+  ["CMITS", "소속위원회"],
+  ["TEL_NO", "연락처"],
+  ["E_MAIL", "이메일"],
+  ["HOMEPAGE", "홈페이지"],
+  ["STAFF", "사무실"],
+  ["SECRETARY", "보좌관"],
+  ["SECRETARY2", "비서관"],
+  ["MEM_TITLE", "약력"],
+  ["ASSEM_ADDR", "사무실주소"],
+  ["BTH_DATE", "생년월일"],
+  ["BTH_GBN_NM", "음양력"],
+  ["JOB_RES_NM", "직책"],
+  ["UNITS", "대수"],
+] as const;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatRow(
+  row: Readonly<Record<string, unknown>>,
+  fields: ReadonlyArray<readonly [string, string]>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, label] of fields) {
+    const value = row[key];
+    if (value !== undefined && value !== null && value !== "") {
+      result[label] = value;
+    }
+  }
+  return result;
+}
+
+function buildQueryParams(params: {
+  readonly name?: string;
+  readonly party?: string;
+  readonly district?: string;
+  readonly age?: number;
+  readonly page?: number;
+  readonly page_size?: number;
+}, maxPageSize: number): Record<string, string | number> {
+  const queryParams: Record<string, string | number> = {};
+
+  if (params.name) queryParams.HG_NM = params.name;
+  if (params.party) queryParams.POLY_NM = params.party;
+  if (params.district) queryParams.ORIG_NM = params.district;
+  if (params.age) queryParams.UNIT_CD = `100${String(params.age).padStart(4, "0")}`;
+  if (params.page) queryParams.pIndex = params.page;
+  if (params.page_size) queryParams.pSize = Math.min(params.page_size, maxPageSize);
+
+  return queryParams;
+}
+
+// ---------------------------------------------------------------------------
+// Registration
+// ---------------------------------------------------------------------------
+
+export function registerLiteMemberTools(
+  server: McpServer,
+  config: AppConfig,
+): void {
+  const api = createApiClient(config);
+
+  server.tool(
+    "search_members",
+    "국회의원 통합 검색 도구입니다. 이름, 정당, 선거구, 대수로 검색할 수 있으며, " +
+      "이름 검색 결과가 1명이면 자동으로 상세 정보(약력, 연락처, SNS 등)를 반환합니다. " +
+      "get_members와 get_member_detail을 통합한 도구입니다.",
+    {
+      name: z.string().optional().describe("의원 이름 (부분 일치 검색)"),
+      party: z.string().optional().describe("정당명"),
+      district: z.string().optional().describe("선거구명"),
+      age: z.number().optional().describe("대수 (예: 22 = 제22대 국회)"),
+      page: z.number().optional().describe("페이지 번호 (기본: 1)"),
+      page_size: z.number().optional().describe("페이지 크기 (기본: 20, 최대: 100)"),
+    },
+    async (params) => {
+      try {
+        const queryParams = buildQueryParams(params, config.apiResponse.maxPageSize);
+
+        const result = await api.fetchOpenAssembly(
+          API_CODES.MEMBER_INFO,
+          queryParams,
+        );
+
+        if (result.rows.length === 0) {
+          const filters = [
+            params.name ? `이름="${params.name}"` : null,
+            params.party ? `정당="${params.party}"` : null,
+            params.district ? `선거구="${params.district}"` : null,
+            params.age ? `제${params.age}대` : null,
+          ].filter(Boolean).join(", ");
+
+          return {
+            content: [{
+              type: "text" as const,
+              text: `검색 결과가 없습니다. (조건: ${filters || "없음"})`,
+            }],
+          };
+        }
+
+        // 결과가 1건이면 상세 정보 반환
+        if (result.rows.length === 1) {
+          const detail = formatRow(result.rows[0], DETAIL_FIELDS);
+          return {
+            content: [{
+              type: "text" as const,
+              text: `국회의원 상세정보\n\n${JSON.stringify(detail, null, 2)}`,
+            }],
+          };
+        }
+
+        // 여러 건이면 요약 목록 반환
+        const summaries = result.rows.map((row) => formatRow(row, SUMMARY_FIELDS));
+        return {
+          content: [{
+            type: "text" as const,
+            text: `국회의원 검색 결과 (총 ${result.totalCount}건, ${result.rows.length}건 표시)\n\n${JSON.stringify(summaries, null, 2)}`,
+          }],
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+}

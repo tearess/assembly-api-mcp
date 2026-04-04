@@ -1,0 +1,13 @@
+{
+  "mcp": {
+    "servers": {
+      "cong": {
+        "command": "node",
+        "args": ["path/to/cong/dist/index.js"],
+        "env": {
+          "ASSEMBLY_API_KEY": "your-api-key-here"
+        }
+      }
+    }
+  }
+}

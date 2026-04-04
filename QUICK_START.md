@@ -1,0 +1,188 @@
+# 빠른 시작 가이드
+
+5분 안에 국회 API MCP 서버를 실행하는 방법입니다.
+
+---
+
+## 1단계: API 키 발급 (2분)
+
+1. [열린국회정보](https://open.assembly.go.kr) 접속
+2. **회원가입** (무료, 즉시 완료)
+3. 로그인 → **마이페이지** → **OPEN API** → **인증키 발급**
+4. 발급된 32자리 키를 복사
+
+> 키 발급 전에도 `sample` 키로 테스트할 수 있습니다 (최대 10건).
+
+---
+
+## 2단계: 설치 및 설정 (2분)
+
+```bash
+# 프로젝트 클론
+git clone https://github.com/jonghongjeon/cong.git
+cd cong
+
+# 의존성 설치 및 빌드
+npm install
+npm run build
+
+# 환경 변수 설정
+cp .env.example .env
+```
+
+`.env` 파일을 열어 API 키를 입력합니다:
+
+```env
+ASSEMBLY_API_KEY=여기에_발급받은_키_입력
+```
+
+---
+
+## 3단계: 동작 확인 (1분)
+
+```bash
+# API 작동 테스트
+npx tsx src/cli.ts test
+```
+
+정상이면 이렇게 출력됩니다:
+
+```
+=== 전체 API 작동 테스트 ===
+
+✓ 의원 인적사항              295건
+✓ 의원 발의법률안           16477건
+✓ 의안 통합검색            17626건
+✓ 의안 접수목록           118682건
+...
+결과: 11/11 API 정상 작동
+```
+
+---
+
+## 4단계: Claude Desktop 연동
+
+### macOS
+
+설정 파일 위치: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "cong": {
+      "command": "node",
+      "args": ["/Users/YOUR_USERNAME/git/cong/dist/index.js"],
+      "env": {
+        "ASSEMBLY_API_KEY": "여기에_발급받은_키_입력"
+      }
+    }
+  }
+}
+```
+
+### Windows
+
+설정 파일 위치: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "cong": {
+      "command": "node",
+      "args": ["C:\\Users\\YOUR_USERNAME\\git\\cong\\dist\\index.js"],
+      "env": {
+        "ASSEMBLY_API_KEY": "여기에_발급받은_키_입력"
+      }
+    }
+  }
+}
+```
+
+### 적용
+
+1. `args`의 경로를 실제 설치 경로로 수정
+2. `ASSEMBLY_API_KEY`에 발급받은 키 입력
+3. **Claude Desktop 완전 종료** (트레이 아이콘까지 닫기)
+4. Claude Desktop 재시작
+
+---
+
+## 5단계: 사용해 보기
+
+### Claude Desktop에서
+
+Claude에게 다음과 같이 질문하면 됩니다:
+
+- "현재 국회의원 목록을 보여줘"
+- "교육 관련 의안을 검색해줘"
+- "고민정 의원의 의정활동을 분석해줘"
+- "최근 본회의에서 처리된 법안은?"
+- "제22대 국회 위원회 목록을 알려줘"
+- "현재 계류 중인 청원 목록을 보여줘"
+
+> Lite 프로필(기본)에서는 7개 통합 도구가 사용됩니다.
+
+### CLI에서
+
+```bash
+# 의원 검색
+npx tsx src/cli.ts members --party 국민의힘 --size 5
+
+# 의안 검색
+npx tsx src/cli.ts bills --name 부동산
+
+# 의원 의정활동
+npx tsx src/cli.ts activity --name 고민정
+
+# 계류의안
+npx tsx src/cli.ts pending --size 10
+
+# 전체 API 목록 (276개)
+npx tsx src/cli.ts meta
+```
+
+### HTTP 서버 모드
+
+```bash
+# .env에서 MCP_TRANSPORT=http 설정 후
+npm start
+# → http://localhost:3000/mcp 에서 MCP 프로토콜 접근
+# → http://localhost:3000/health 에서 상태 확인
+```
+
+### 브라우저 테스터
+
+```bash
+open examples/api-tester.html
+# 브라우저에서 API를 직접 테스트할 수 있습니다
+```
+
+---
+
+## 문제 해결
+
+### "ASSEMBLY_API_KEY가 설정되지 않았습니다"
+
+→ `.env` 파일에 키를 입력했는지 확인하세요.
+
+### Claude Desktop에서 도구가 보이지 않음
+
+→ Claude Desktop을 **완전히 종료** (macOS: Cmd+Q, 트레이 아이콘도 닫기) 후 재시작하세요.
+
+### API 호출이 0건 반환
+
+→ 일부 API는 `AGE` 파라미터가 필요합니다. 도구들은 자동으로 22대(현재)를 기본값으로 사용합니다.
+
+### Rate Limit 초과
+
+→ 개발계정은 월 10,000건 제한입니다. `npx tsx src/cli.ts test`로 현재 상태를 확인하세요.
+
+---
+
+## 다음 단계
+
+- [README.md](README.md) — 전체 프로젝트 설명, Lite(7개)/Full(23개) 도구 목록
+- [docs/api-catalog.md](docs/api-catalog.md) — 국회 API 276개 전체 목록
+- [docs/mcp-api.md](docs/mcp-api.md) — MCP 도구 ↔ API 매핑 상세
+- [docs/discovered-codes.md](docs/discovered-codes.md) — 발굴된 API 코드 및 파라미터
+- [docs/mcp-design-analysis.md](docs/mcp-design-analysis.md) — MCP 도구 설계 분석 보고서
