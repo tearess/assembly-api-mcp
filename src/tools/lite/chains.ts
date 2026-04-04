@@ -206,7 +206,7 @@ export function registerLiteChainTools(
           return {
             content: [{
               type: "text" as const,
-              text: `"${params.name}" 의원을 찾을 수 없습니다. 이름을 확인해 주세요.`,
+              text: JSON.stringify({ total: 0, items: [], query: { name: params.name } }),
             }],
           };
         }
@@ -228,26 +228,33 @@ export function registerLiteChainTools(
 
         const bills = billsResult.rows.map(extractBillSummary);
 
-        // Step 3: 종합 보고서 생성
-        const report = [
-          formatMemberSection(memberInfo),
-          "",
-          formatBillList(bills, billsResult.totalCount, "발의 법안"),
-          "",
-          formatVoteList(
-            votesResult.rows,
-            votesResult.totalCount,
-            age,
-          ),
-        ].join("\n");
-
+        // Step 3: 종합 보고서 생성 (pure JSON)
         return {
-          content: [{ type: "text" as const, text: report }],
+          content: [{ type: "text" as const, text: JSON.stringify({
+            member: memberInfo,
+            bills: {
+              total: billsResult.totalCount,
+              items: bills,
+            },
+            votes: {
+              total: votesResult.totalCount,
+              age,
+              items: votesResult.rows.map((row) => ({
+                billNo: String(row.BILL_NO ?? row.BILL_ID ?? ""),
+                billName: String(row.BILL_NAME ?? row.BILL_NM ?? ""),
+                result: String(row.RESULT ?? row.PROC_RESULT ?? ""),
+              })),
+            },
+          }) }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
+          : message.includes('rate') ? 'RATE_LIMIT'
+          : message.includes('timeout') ? 'TIMEOUT'
+          : 'UNKNOWN';
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code }) }],
           isError: true,
         };
       }
@@ -291,8 +298,9 @@ export function registerLiteChainTools(
           return {
             content: [{
               type: "text" as const,
-              text: "검색 키워드를 입력해 주세요.",
+              text: JSON.stringify({ error: "검색 키워드를 입력해 주세요.", code: "INVALID_INPUT" }),
             }],
+            isError: true,
           };
         }
 
@@ -301,8 +309,9 @@ export function registerLiteChainTools(
           return {
             content: [{
               type: "text" as const,
-              text: `키워드는 최대 ${MAX_KEYWORDS}개까지 입력 가능합니다. (입력: ${keywordList.length}개)`,
+              text: JSON.stringify({ error: `키워드는 최대 ${MAX_KEYWORDS}개까지 입력 가능합니다. (입력: ${keywordList.length}개)`, code: "INVALID_INPUT" }),
             }],
+            isError: true,
           };
         }
 
@@ -355,21 +364,29 @@ export function registerLiteChainTools(
           }
         }
 
-        // Step 4: 결과 포맷팅
-        const report = formatTrackingResult(
-          keywordList,
-          age,
-          uniqueBills,
-          histories,
-        );
+        // Step 4: 결과 포맷팅 (pure JSON)
+        const historiesObj: Record<string, readonly Record<string, unknown>[]> = {};
+        for (const [billNo, rows] of histories) {
+          historiesObj[billNo] = rows;
+        }
 
         return {
-          content: [{ type: "text" as const, text: report }],
+          content: [{ type: "text" as const, text: JSON.stringify({
+            keywords: keywordList,
+            age,
+            total: uniqueBills.length,
+            items: uniqueBills,
+            histories: Object.keys(historiesObj).length > 0 ? historiesObj : undefined,
+          }) }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
+          : message.includes('rate') ? 'RATE_LIMIT'
+          : message.includes('timeout') ? 'TIMEOUT'
+          : 'UNKNOWN';
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code }) }],
           isError: true,
         };
       }

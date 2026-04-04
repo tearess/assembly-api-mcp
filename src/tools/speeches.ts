@@ -36,7 +36,6 @@ export function registerSpeechTools(
         const age = params.age ?? CURRENT_AGE;
         const activityType = params.activity_type ?? "all";
         const pageSize = Math.min(params.page_size ?? 10, config.apiResponse.maxPageSize);
-        const sections: string[] = [];
 
         // 의원 기본 정보
         const memberResult = await api.fetchOpenAssembly(API_CODES.MEMBER_INFO, {
@@ -48,17 +47,12 @@ export function registerSpeechTools(
           return {
             content: [{
               type: "text" as const,
-              text: `"${params.name}" 의원을 찾을 수 없습니다.`,
+              text: JSON.stringify({ total: 0, items: [], query: { name: params.name } }),
             }],
           };
         }
 
         const member = memberResult.rows[0]!;
-        sections.push(
-          `■ ${member.HG_NM} 의원 (${member.POLY_NM}, ${member.ORIG_NM})`,
-          `  당선: ${member.REELE_GBN_NM} | 소속위원회: ${member.CMITS}`,
-          "",
-        );
 
         // 발의 법안 + 본회의 표결을 병렬 조회 (Promise.all)
         const wantBills = activityType === "all" || activityType === "bills";
@@ -73,41 +67,53 @@ export function registerSpeechTools(
             : Promise.resolve(null),
         ]);
 
+        const result: Record<string, unknown> = {
+          member: {
+            name: member.HG_NM,
+            party: member.POLY_NM,
+            district: member.ORIG_NM,
+            reelection: member.REELE_GBN_NM,
+            committees: member.CMITS,
+          },
+        };
+
         if (billResult) {
-          sections.push(`■ 발의 법안 (총 ${billResult.totalCount}건)`);
-          if (billResult.rows.length > 0) {
-            for (const row of billResult.rows) {
-              const status = row.PROC_RESULT ?? "계류";
-              sections.push(`  - [${row.BILL_NO}] ${row.BILL_NAME} (${status})`);
-            }
-          } else {
-            sections.push("  (발의 법안 없음)");
-          }
-          sections.push("");
+          result.bills = {
+            total: billResult.totalCount,
+            items: billResult.rows.map((row) => ({
+              billNo: row.BILL_NO,
+              billName: row.BILL_NAME,
+              status: row.PROC_RESULT ?? "계류",
+            })),
+          };
         }
 
         if (voteResult) {
-          sections.push(`■ 본회의 표결 현황 (제${age}대, 총 ${voteResult.totalCount}건)`);
-          if (voteResult.rows.length > 0) {
-            for (const row of voteResult.rows) {
-              sections.push(`  - [${row.BILL_NO}] ${row.BILL_NM} (${row.PROC_RESULT_CD ?? row.BILL_KIND})`);
-            }
-          } else {
-            sections.push("  (표결 정보 없음)");
-          }
-          sections.push("");
+          result.votes = {
+            total: voteResult.totalCount,
+            age,
+            items: voteResult.rows.map((row) => ({
+              billNo: row.BILL_NO,
+              billName: row.BILL_NM,
+              result: row.PROC_RESULT_CD ?? row.BILL_KIND,
+            })),
+          };
         }
 
         return {
           content: [{
             type: "text" as const,
-            text: sections.join("\n"),
+            text: JSON.stringify(result),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
+          : message.includes('rate') ? 'RATE_LIMIT'
+          : message.includes('timeout') ? 'TIMEOUT'
+          : 'UNKNOWN';
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code }) }],
           isError: true,
         };
       }

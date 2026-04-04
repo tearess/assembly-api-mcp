@@ -63,13 +63,17 @@ export function registerMemberTools(
         return {
           content: [{
             type: "text" as const,
-            text: `국회의원 검색 결과 (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, items: formatted }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
+          : message.includes('rate') ? 'RATE_LIMIT'
+          : message.includes('timeout') ? 'TIMEOUT'
+          : 'UNKNOWN';
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code }) }],
           isError: true,
         };
       }
@@ -99,7 +103,7 @@ export function registerMemberTools(
           return {
             content: [{
               type: "text" as const,
-              text: `"${params.name}" 의원을 찾을 수 없습니다.`,
+              text: JSON.stringify({ total: 0, items: [], query: { name: params.name } }),
             }],
           };
         }
@@ -107,13 +111,17 @@ export function registerMemberTools(
         return {
           content: [{
             type: "text" as const,
-            text: `의원 상세정보\n\n${JSON.stringify(result.rows[0], null, 2)}`,
+            text: JSON.stringify({ total: 1, item: result.rows[0] }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
+          : message.includes('rate') ? 'RATE_LIMIT'
+          : message.includes('timeout') ? 'TIMEOUT'
+          : 'UNKNOWN';
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code }) }],
           isError: true,
         };
       }

@@ -120,17 +120,10 @@ export function registerLiteMemberTools(
         );
 
         if (result.rows.length === 0) {
-          const filters = [
-            params.name ? `이름="${params.name}"` : null,
-            params.party ? `정당="${params.party}"` : null,
-            params.district ? `선거구="${params.district}"` : null,
-            params.age ? `제${params.age}대` : null,
-          ].filter(Boolean).join(", ");
-
           return {
             content: [{
               type: "text" as const,
-              text: `검색 결과가 없습니다. (조건: ${filters || "없음"})`,
+              text: JSON.stringify({ total: 0, items: [], query: { name: params.name, party: params.party, district: params.district, age: params.age } }),
             }],
           };
         }
@@ -141,7 +134,7 @@ export function registerLiteMemberTools(
           return {
             content: [{
               type: "text" as const,
-              text: `국회의원 상세정보\n\n${JSON.stringify(detail, null, 2)}`,
+              text: JSON.stringify({ total: 1, item: detail }),
             }],
           };
         }
@@ -151,13 +144,17 @@ export function registerLiteMemberTools(
         return {
           content: [{
             type: "text" as const,
-            text: `국회의원 검색 결과 (총 ${result.totalCount}건, ${result.rows.length}건 표시)\n\n${JSON.stringify(summaries, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, returned: result.rows.length, items: summaries }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
+          : message.includes('rate') ? 'RATE_LIMIT'
+          : message.includes('timeout') ? 'TIMEOUT'
+          : 'UNKNOWN';
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code }) }],
           isError: true,
         };
       }

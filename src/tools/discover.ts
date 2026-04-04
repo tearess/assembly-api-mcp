@@ -106,26 +106,27 @@ export function registerDiscoverTools(
         const limit = params.page_size ?? 20;
         const entries = filtered.slice(0, limit).map(toEntry);
 
-        const header =
-          `API 검색 결과 (${entries.length}건 / 전체 ${result.totalCount}건 중 필터 매칭 ${filtered.length}건)`;
-
-        const guidance =
-          "\n\n💡 참고: INF_ID는 API 식별 번호이며, 실제 API 호출 코드와 다를 수 있습니다. " +
-          "query_assembly 도구에서 사용할 API 코드는 열린국회정보 포털에서 확인하거나, " +
-          "src/api/codes.ts에 정의된 코드를 사용하세요.";
-
         return {
           content: [
             {
               type: "text" as const,
-              text: `${header}\n\n${JSON.stringify(entries, null, 2)}${guidance}`,
+              text: JSON.stringify({
+                total: result.totalCount,
+                matched: filtered.length,
+                returned: entries.length,
+                items: entries,
+              }),
             },
           ],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
+          : message.includes('rate') ? 'RATE_LIMIT'
+          : message.includes('timeout') ? 'TIMEOUT'
+          : 'UNKNOWN';
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code }) }],
           isError: true,
         };
       }

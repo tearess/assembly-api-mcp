@@ -2,6 +2,22 @@
 
 ---
 
+## 2026-04-04: 세션 4 — 프로젝트 리네이밍 및 저장소 이전
+
+### 변경 내용
+
+프로젝트 식별자를 `cong`에서 `assembly-api`로 변경하고, GitHub 저장소를 `hollobit/assembly-api-mcp`로 이전.
+
+| 카테고리 | 변경 |
+|----------|------|
+| 저장소 URL | `jonghongjeon/cong` → `hollobit/assembly-api-mcp` |
+| MCP 서버 키 | `"cong"` → `"assembly-api"` (설정 파일의 서버 식별자) |
+| 디렉토리명 | 문서 내 `cong/` → `assembly-api/` / `assembly-api-mcp/` |
+| 변경 파일 | `README.md`, `QUICK_START.md`, `CONTRIBUTING.md`, `examples/claude-desktop-config.json`, `examples/vscode-settings.json` |
+| 미변경 | `HISTORY.md` (과거 기록 보존), `Dockerfile` 비루트 사용자 `cong` (런타임 내부), `package.json` (이미 `assembly-api-mcp`) |
+
+---
+
 ## 2026-04-04: 세션 3 — Phase 12: 프로필 기반 통합 MCP 인터페이스 (7개 도구)
 
 ### 배경

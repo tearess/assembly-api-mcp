@@ -65,36 +65,31 @@ export function registerQueryTools(
             ? Object.keys(result.rows[0])
             : [];
 
-        const summary = [
-          `API: ${params.api_code}`,
-          `총 건수: ${result.totalCount}`,
-          `반환 건수: ${result.rows.length}`,
-          `필드: ${fieldNames.join(", ")}`,
-        ].join("\n");
-
         return {
           content: [
             {
               type: "text" as const,
-              text: `${summary}\n\n${JSON.stringify(result.rows, null, 2)}`,
+              text: JSON.stringify({
+                api: params.api_code,
+                total: result.totalCount,
+                returned: result.rows.length,
+                fields: fieldNames,
+                items: result.rows,
+              }),
             },
           ],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-
-        const helpText =
-          message.includes("오류") || message.includes("ERROR")
-            ? "\n\n💡 API 코드가 올바른지 확인하세요. " +
-              "discover_apis 도구로 사용 가능한 API를 검색하거나, " +
-              "src/api/codes.ts에 정의된 검증된 코드를 사용해 보세요."
-            : "";
-
+        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
+          : message.includes('rate') ? 'RATE_LIMIT'
+          : message.includes('timeout') ? 'TIMEOUT'
+          : 'UNKNOWN';
         return {
           content: [
             {
               type: "text" as const,
-              text: `오류: ${message}${helpText}`,
+              text: JSON.stringify({ error: message, code }),
             },
           ],
           isError: true,

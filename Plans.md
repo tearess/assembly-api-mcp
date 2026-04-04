@@ -4,7 +4,7 @@
 
 ---
 
-## 완료된 Phase (58/62 태스크)
+## 완료된 Phase (59/63 태스크)
 
 | Phase | 내용 | 태스크 | 상태 |
 |-------|------|--------|------|
@@ -18,6 +18,7 @@
 | 8 | 미매핑 API 도구화 (계류/처리/최근/심사/표결/통합/이력 7개) | 7/7 | cc:完了 |
 | 10 | 배포 (Docker, CI/CD, 모니터링, Rate Limit) | 4/5 | 10.5 미완 |
 | 11 | 통합 인터페이스 (discover_apis, query_assembly, 동적 카탈로그) | 6/6 | cc:完了 |
+| 13 | 리네이밍 (cong→assembly-api, 저장소 hollobit/assembly-api-mcp 이전) | 1/1 | cc:完了 |
 
 ---
 

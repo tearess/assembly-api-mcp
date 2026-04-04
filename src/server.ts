@@ -93,14 +93,36 @@ async function startStdioTransport(config: AppConfig): Promise<McpServer> {
 
 const MCP_ENDPOINT = "/mcp";
 
+/** Session entry — transport + last-used timestamp for cleanup */
+interface SessionEntry {
+  transport: StreamableHTTPServerTransport;
+  server: McpServer;
+  lastUsed: number;
+}
+
+/** Session TTL: 30 minutes */
+const SESSION_TTL_MS = 30 * 60 * 1000;
+
+/** Session cleanup interval: 5 minutes */
+const SESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
 async function startHttpTransport(config: AppConfig): Promise<McpServer> {
-  const server = buildMcpServer(config);
+  const sessions = new Map<string, SessionEntry>();
 
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => randomUUID(),
-  });
-
-  await server.connect(transport);
+  // Periodic cleanup of stale sessions
+  const cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [id, entry] of sessions) {
+      if (now - entry.lastUsed > SESSION_TTL_MS) {
+        process.stderr.write(
+          `[assembly-api-mcp] 세션 만료, 정리합니다: ${id}\n`,
+        );
+        void entry.transport.close();
+        sessions.delete(id);
+      }
+    }
+  }, SESSION_CLEANUP_INTERVAL_MS);
+  cleanupTimer.unref();
 
   const httpServer = createHttpServer(
     (req: IncomingMessage, res: ServerResponse) => {
@@ -109,13 +131,13 @@ async function startHttpTransport(config: AppConfig): Promise<McpServer> {
       // Health-check endpoint
       if (url === "/health" && req.method === "GET") {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "ok" }));
+        res.end(JSON.stringify({ status: "ok", sessions: sessions.size }));
         return;
       }
 
-      // MCP endpoint — delegate to StreamableHTTPServerTransport
+      // MCP endpoint — per-session transport routing
       if (url === MCP_ENDPOINT) {
-        transport.handleRequest(req, res);
+        void handleMcpRequest(req, res, config, sessions);
         return;
       }
 
@@ -140,7 +162,12 @@ async function startHttpTransport(config: AppConfig): Promise<McpServer> {
   // Graceful shutdown
   const shutdown = async (): Promise<void> => {
     process.stderr.write("[assembly-api-mcp] 서버를 종료합니다...\n");
-    await transport.close();
+    clearInterval(cleanupTimer);
+    const closePromises = Array.from(sessions.values()).map((entry) =>
+      entry.transport.close(),
+    );
+    await Promise.all(closePromises);
+    sessions.clear();
     httpServer.close();
   };
 
@@ -151,7 +178,63 @@ async function startHttpTransport(config: AppConfig): Promise<McpServer> {
     void shutdown();
   });
 
-  return server;
+  // Return a "template" server instance (not bound to any session)
+  return buildMcpServer(config);
+}
+
+async function handleMcpRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  config: AppConfig,
+  sessions: Map<string, SessionEntry>,
+): Promise<void> {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+  // Existing session — route to stored transport
+  if (sessionId && sessions.has(sessionId)) {
+    const entry = sessions.get(sessionId)!;
+    entry.lastUsed = Date.now();
+    await entry.transport.handleRequest(req, res);
+    return;
+  }
+
+  // New session — only allowed via POST (initialization) or when no session ID
+  if (!sessionId && req.method === "POST") {
+    const newTransport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    });
+    const newServer = buildMcpServer(config);
+    await newServer.connect(newTransport);
+
+    // Handle the request (this will generate the session ID in the response)
+    await newTransport.handleRequest(req, res);
+
+    // Store the session using the transport's generated session ID
+    const newSessionId = newTransport.sessionId;
+    if (newSessionId) {
+      sessions.set(newSessionId, {
+        transport: newTransport,
+        server: newServer,
+        lastUsed: Date.now(),
+      });
+      process.stderr.write(
+        `[assembly-api-mcp] 새 세션 생성: ${newSessionId} (총 ${sessions.size}개)\n`,
+      );
+
+      // Clean up when transport closes
+      newTransport.onclose = () => {
+        sessions.delete(newSessionId);
+        process.stderr.write(
+          `[assembly-api-mcp] 세션 종료: ${newSessionId} (남은 ${sessions.size}개)\n`,
+        );
+      };
+    }
+    return;
+  }
+
+  // Invalid or expired session
+  res.writeHead(400, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Invalid or expired session" }));
 }
 
 // ---------------------------------------------------------------------------

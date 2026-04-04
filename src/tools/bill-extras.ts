@@ -56,13 +56,13 @@ export function registerBillExtraTools(
         return {
           content: [{
             type: "text" as const,
-            text: `계류의안 조회 결과 (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, items: formatted }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
           isError: true,
         };
       }
@@ -104,13 +104,13 @@ export function registerBillExtraTools(
         return {
           content: [{
             type: "text" as const,
-            text: `처리의안 조회 결과 (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, items: formatted }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
           isError: true,
         };
       }
@@ -150,13 +150,13 @@ export function registerBillExtraTools(
         return {
           content: [{
             type: "text" as const,
-            text: `최근 본회의 처리의안 (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, items: formatted }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
           isError: true,
         };
       }
@@ -198,13 +198,13 @@ export function registerBillExtraTools(
         return {
           content: [{
             type: "text" as const,
-            text: `의안 심사정보 (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, items: formatted }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
           isError: true,
         };
       }
@@ -244,13 +244,13 @@ export function registerBillExtraTools(
         return {
           content: [{
             type: "text" as const,
-            text: `본회의 표결정보 (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, items: formatted }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
           isError: true,
         };
       }
@@ -294,13 +294,13 @@ export function registerBillExtraTools(
         return {
           content: [{
             type: "text" as const,
-            text: `의안 통합검색 결과 (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, items: formatted }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
           isError: true,
         };
       }
@@ -344,13 +344,13 @@ export function registerBillExtraTools(
         return {
           content: [{
             type: "text" as const,
-            text: `의안 접수/처리 이력 (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+            text: JSON.stringify({ total: result.totalCount, items: formatted }),
           }],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
           isError: true,
         };
       }

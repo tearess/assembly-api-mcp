@@ -262,14 +262,14 @@ export function registerLiteRecordTools(
           content: [
             {
               type: "text" as const,
-              text: `${label} (총 ${result.totalCount}건)\n\n${JSON.stringify(formatted, null, 2)}`,
+              text: JSON.stringify({ total: result.totalCount, items: formatted }),
             },
           ],
         };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text" as const, text: `오류: ${message}` }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
           isError: true,
         };
       }
