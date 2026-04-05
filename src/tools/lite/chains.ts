@@ -22,6 +22,8 @@ interface MemberInfo {
   readonly district: string;
   readonly reelection: string;
   readonly committees: string;
+  readonly photo: string;
+  readonly memberCode: string;
 }
 
 interface BillSummary {
@@ -39,12 +41,15 @@ interface BillSummary {
 function extractMemberInfo(
   row: Readonly<Record<string, unknown>>,
 ): MemberInfo {
+  const monaCode = String(row.MONA_CD ?? "");
   return {
     name: String(row.HG_NM ?? ""),
     party: String(row.POLY_NM ?? ""),
     district: String(row.ORIG_NM ?? ""),
     reelection: String(row.REELE_GBN_NM ?? ""),
     committees: String(row.CMITS ?? ""),
+    photo: monaCode ? `https://www.assembly.go.kr/photo/${monaCode}.jpg` : "",
+    memberCode: monaCode,
   };
 }
 

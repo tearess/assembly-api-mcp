@@ -107,10 +107,38 @@ export function registerBillTools(
           };
         }
 
+        // 원시 필드 전체 반환 (제안이유, 주요내용, 심사경과 등 포함)
+        const row = result.rows[0];
+        const detail = {
+          BILL_ID: row.BILL_ID,
+          BILL_NO: row.BILL_NO,
+          BILL_NAME: row.BILL_NAME,
+          PROPOSER: row.PROPOSER,
+          PROPOSE_DT: row.PROPOSE_DT,
+          COMMITTEE: row.COMMITTEE,
+          CURR_COMMITTEE: row.CURR_COMMITTEE,
+          PROC_RESULT_CD: row.PROC_RESULT_CD,
+          PROC_DT: row.PROC_DT,
+          DETAIL_LINK: row.DETAIL_LINK,
+          LINK_URL: row.LINK_URL,
+          RST_PROPOSER: row.RST_PROPOSER,
+          PUBL_PROPOSER: row.PUBL_PROPOSER,
+          LAW_PROC_DT: row.LAW_PROC_DT,
+          LAW_SUBMIT_DT: row.LAW_SUBMIT_DT,
+          CMT_PRESENT_DT: row.CMT_PRESENT_DT,
+          CMT_PROC_DT: row.CMT_PROC_DT,
+          CMT_PROC_RESULT_CD: row.CMT_PROC_RESULT_CD,
+          LAW_PRESENT_DT: row.LAW_PRESENT_DT,
+          LAW_PROC_RESULT_CD: row.LAW_PROC_RESULT_CD,
+          RGS_PROC_DT: row.RGS_PROC_DT,
+          // 모든 원시 필드도 포함
+          ...row,
+        };
+
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ total: 1, items: [result.rows[0]] }),
+            text: JSON.stringify({ total: 1, items: [detail] }),
           }],
         };
       } catch (err: unknown) {

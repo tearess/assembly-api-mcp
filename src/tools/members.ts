@@ -58,6 +58,8 @@ export function registerMemberTools(
           사무실: row.STAFF,
           보좌관: row.SECRETARY,
           비서관: row.SECRETARY2,
+          사진: row.MONA_CD ? `https://www.assembly.go.kr/photo/${String(row.MONA_CD)}.jpg` : '',
+          의원코드: row.MONA_CD,
         }));
 
         return {
