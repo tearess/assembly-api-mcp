@@ -110,6 +110,7 @@ async function cmdBills(flags: Record<string, string>): Promise<void> {
     AGE: Number(flags.age ?? CURRENT_AGE),
     pSize: Number(flags.size ?? 20),
   };
+  if (flags["bill-no"]) params.BILL_NO = flags["bill-no"];
   if (flags.name) params.BILL_NAME = flags.name;
   if (flags.proposer) params.PROPOSER = flags.proposer;
 
@@ -258,6 +259,7 @@ function printHelp(): void {
     --district <선거구>  선거구
 
   bills                의안 검색
+    --bill-no <번호>    의안번호 (예: 2204567)
     --name <의안명>     의안명 검색
     --proposer <제안자>  제안자 이름
     --age <대수>        대수 (기본: 22)

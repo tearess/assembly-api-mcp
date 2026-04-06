@@ -138,6 +138,9 @@ npx tsx src/cli.ts activity --name 이해민
 # 의안 검색
 npx tsx src/cli.ts bills --name AI
 
+# 의안번호로 검색
+npx tsx src/cli.ts bills --bill-no 2204567
+
 # 의안 상세
 npx tsx src/cli.ts bill-detail <BILL_ID>
 
