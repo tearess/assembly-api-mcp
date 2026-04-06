@@ -11,6 +11,14 @@ import { createServer } from "./server.js";
 import { loadConfig } from "./config.js";
 
 async function main(): Promise<void> {
+  // setup 명령 감지: npx assembly-api-mcp setup
+  const command = process.argv[2];
+  if (command === "setup") {
+    const { runSetup } = await import("./setup.js");
+    await runSetup();
+    return;
+  }
+
   let config;
   try {
     config = loadConfig();

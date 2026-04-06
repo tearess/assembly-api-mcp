@@ -16,6 +16,16 @@ Claude, ChatGPT 등 AI 도구에서 국회의원, 의안, 일정, 회의록, 위
 
 ## 빠른 시작
 
+### 방법 1: 자동 설치 (권장)
+
+```bash
+npx assembly-api-mcp setup
+```
+
+대화형 마법사가 API 키 입력 → 프로필 선택 → AI 클라이언트 설정을 자동으로 처리합니다.
+
+### 방법 2: 수동 설치
+
 > 상세한 가이드는 [QUICK_START.md](QUICK_START.md)를 참조하세요.
 
 ```bash

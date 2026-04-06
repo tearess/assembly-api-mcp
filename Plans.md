@@ -63,6 +63,38 @@ Lite 도구 구성:
 | 12.5 | `MCP_PROFILE` 분기 + `registerLiteTools` | config.ts에 profile 추가, server.ts에서 lite→7개/full→23개 분기, .env.example 반영 | 12.1-12.4 | cc:完了 |
 | 12.6 | 테스트 + Resource + 문서 | Lite 7개 도구 테스트(9개), Full 기존 테스트 유지(60개), assembly://tools-guide Resource | 12.5 | cc:完了 |
 
+### Phase 14: 설치 편의성 개선 (Easy Install)
+
+Purpose: git clone + build + JSON 수동 편집 없이, 한 줄 명령으로 설치·연동할 수 있게 한다.
+
+현재 설치 마찰:
+- git clone → npm install → npm run build (3단계 빌드)
+- .env 파일 복사 + 편집기로 키 입력
+- Claude Desktop JSON 수동 편집 (경로 직접 입력, transport 실수)
+- 비개발자에게 진입 장벽 높음
+
+| Task | 내용 | DoD | Depends | Status |
+|------|------|-----|---------|--------|
+| 14.1 | npx 원클릭 실행 지원 | `npx assembly-api-mcp` 으로 빌드 없이 바로 실행 가능. package.json bin 필드 + npm publish, shebang 동작 확인 | - | cc:完了 |
+| 14.2 | `setup` CLI 명령 추가 | `npx assembly-api-mcp setup` 으로 대화형 설정 (API 키 입력 → 프로필 선택 → 6개 클라이언트 자동 설정). 플랫폼 감지(macOS/Windows/Linux) | 14.1 | cc:完了 |
+| 14.3 | Claude Desktop 자동 설정 | setup 명령이 claude_desktop_config.json을 자동으로 찾아 assembly-api 항목 추가. 기존 설정 보존, MCP_TRANSPORT=stdio 자동 설정 | 14.2 | cc:完了 |
+| 14.4 | Smithery MCP 마켓플레이스 등록 | smithery.ai에 등록하여 `smithery install assembly-api-mcp` 원클릭 설치 지원 | 14.1 | cc:TODO |
+| 14.5 | npm publish + README 설치 가이드 업데이트 | npm 레지스트리에 publish, README의 빠른 시작을 `npx assembly-api-mcp setup`으로 단순화 | 14.1, 14.2 | cc:TODO |
+
+개선 후 설치 흐름:
+```
+# 방법 1: npx (빌드 불필요)
+npx assembly-api-mcp setup
+# → API 키 입력 → Claude Desktop 자동 설정 → 완료
+
+# 방법 2: Smithery (MCP 마켓플레이스)
+smithery install assembly-api-mcp
+
+# 방법 3: 글로벌 설치
+npm install -g assembly-api-mcp
+assembly-api-mcp setup
+```
+
 ---
 
 ## 현재 프로젝트 수치
