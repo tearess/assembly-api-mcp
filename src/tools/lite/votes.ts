@@ -10,6 +10,7 @@ import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type AppConfig } from "../../config.js";
 import { createApiClient } from "../../api/client.js";
 import { API_CODES, CURRENT_AGE } from "../../api/codes.js";
+import { formatToolError } from "../helpers.js";
 
 // ---------------------------------------------------------------------------
 // Formatters
@@ -54,8 +55,7 @@ export function registerLiteVoteTools(
 
   server.tool(
     "get_votes",
-    "국회 표결 결과를 조회합니다. bill_id를 지정하면 해당 의안의 의원별 표결 내역을, " +
-      "생략하면 본회의 전체 표결 목록을 반환합니다.",
+    "국회 표결 결과를 조회합니다. bill_id 없이 호출하면 최근 본회의 전체 표결 현황, bill_id 지정 시 해당 의안의 의원별 찬반 상세를 반환합니다.",
     {
       bill_id: z
         .string()
@@ -105,11 +105,7 @@ export function registerLiteVoteTools(
           ],
         };
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
-          isError: true,
-        };
+        return formatToolError(err);
       }
     },
   );

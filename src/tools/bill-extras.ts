@@ -136,7 +136,7 @@ export function registerBillExtraTools(
         if (params.page_size) queryParams.pSize = Math.min(params.page_size, config.apiResponse.maxPageSize);
 
         const result = await api.fetchOpenAssembly(
-          "nxjuyqnxadtotdrbw",
+          API_CODES.RECENT_PLENARY_BILLS,
           queryParams,
         );
 

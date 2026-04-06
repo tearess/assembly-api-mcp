@@ -10,6 +10,7 @@ import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type AppConfig } from "../../config.js";
 import { createApiClient } from "../../api/client.js";
 import { API_CODES } from "../../api/codes.js";
+import { formatToolError } from "../helpers.js";
 
 // ---------------------------------------------------------------------------
 // Field mappings
@@ -105,10 +106,7 @@ export function registerLiteMemberTools(
 
   server.tool(
     "search_members",
-    "국회의원 통합 검색 도구입니다. 이름, 정당, 선거구, 소속위원회로 검색할 수 있으며, " +
-      "현재 국회의원만 검색 가능합니다. " +
-      "이름 검색 결과가 1명이면 자동으로 상세 정보(약력, 연락처, SNS 등)를 반환합니다. " +
-      "get_members와 get_member_detail을 통합한 도구입니다.",
+    "현재 국회의원을 검색합니다. 이름, 정당, 선거구, 소속위원회로 필터링 가능. 결과가 1명이면 약력·연락처 등 상세 정보를 자동 반환합니다.",
     {
       name: z.string().optional().describe("의원 이름 (부분 일치 검색)"),
       party: z.string().optional().describe("정당명"),
@@ -165,15 +163,7 @@ export function registerLiteMemberTools(
           }],
         };
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        const code = message.includes('API_KEY') ? 'AUTH_ERROR'
-          : message.includes('rate') ? 'RATE_LIMIT'
-          : message.includes('timeout') ? 'TIMEOUT'
-          : 'UNKNOWN';
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code }) }],
-          isError: true,
-        };
+        return formatToolError(err);
       }
     },
   );

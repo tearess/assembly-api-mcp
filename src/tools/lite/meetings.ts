@@ -9,6 +9,7 @@ import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type AppConfig } from "../../config.js";
 import { createApiClient } from "../../api/client.js";
 import { API_CODES, CURRENT_AGE } from "../../api/codes.js";
+import { formatToolError } from "../helpers.js";
 
 // ---------------------------------------------------------------------------
 // Formatter
@@ -39,7 +40,7 @@ export function registerLiteMeetingTools(
 
   server.tool(
     "search_meetings",
-    "국회 회의록을 검색합니다. 키워드, 위원회, 연도, 회의 종류로 검색할 수 있습니다.",
+    "국회 회의록을 검색합니다. 본회의·위원회·국정감사·인사청문회·공청회 유형별로 검색 가능.",
     {
       keyword: z.string().optional().describe("검색 키워드 (안건명에서 검색)"),
       committee: z.string().optional().describe("위원회명 (meeting_type이 '위원회'일 때 사용)"),
@@ -111,11 +112,7 @@ export function registerLiteMeetingTools(
           ],
         };
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: message, code: message.includes('API_KEY') ? 'AUTH_ERROR' : message.includes('rate') ? 'RATE_LIMIT' : message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN' }) }],
-          isError: true,
-        };
+        return formatToolError(err);
       }
     },
   );
