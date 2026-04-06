@@ -201,9 +201,9 @@ describe("MCP Tool Registration", () => {
       const parsed = JSON.parse(content[0].text);
       expect(parsed.total).toBe(1);
       expect(parsed.items).toHaveLength(1);
-      // 1건이므로 상세(DETAIL_FIELDS) 반환 — 영문 키
-      expect(parsed.items[0].name).toBe("홍길동");
-      expect(parsed.items[0].party).toBe("테스트당");
+      // 1건이므로 상세(DETAIL_FIELDS) 반환 — 한글 키
+      expect(parsed.items[0]["이름"]).toBe("홍길동");
+      expect(parsed.items[0]["정당"]).toBe("테스트당");
     });
 
     it("API 에러를 올바르게 처리한다", async () => {
@@ -283,8 +283,8 @@ describe("MCP Tool Registration", () => {
       const parsed = JSON.parse(content[0].text);
       expect(parsed.total).toBe(1);
       expect(parsed.items).toHaveLength(1);
-      expect(parsed.items[0].bill_name).toBe("테스트법률안");
-      expect(parsed.items[0].status).toBe("계류");
+      expect(parsed.items[0]["의안명"]).toBe("테스트법률안");
+      expect(parsed.items[0]["처리상태"]).toBe("계류");
     });
 
     it("API 에러를 올바르게 처리한다", async () => {
@@ -406,7 +406,7 @@ describe("MCP Tool Registration", () => {
       const parsed = JSON.parse(content[0].text);
       expect(parsed.total).toBe(1);
       expect(parsed.items).toHaveLength(1);
-      expect(parsed.items[0].committee).toBe("법제사법위원회");
+      expect(parsed.items[0]["위원회"]).toBe("법제사법위원회");
     });
 
     it("통합 일정 API (ALLSCHEDULE)를 사용한다", async () => {
@@ -480,7 +480,7 @@ describe("MCP Tool Registration", () => {
       const parsed = JSON.parse(content[0].text);
       expect(parsed.total).toBe(1);
       expect(parsed.items).toHaveLength(1);
-      expect(parsed.items[0].title).toBe("법률안 심사");
+      expect(parsed.items[0]["회의명"]).toBe("법률안 심사");
     });
 
     it("본회의 회의록을 요청하면 올바른 API 코드를 사용한다", async () => {

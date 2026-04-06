@@ -19,12 +19,12 @@ function formatMeetingRow(
   row: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
   return {
-    title: row.TITLE ?? row.COMM_NAME ?? row.CLASS_NAME,
-    date: row.CONF_DATE,
-    age: row.DAE_NUM ?? row.ERACO,
-    agenda: row.SUB_NAME,
-    pdf_url: row.PDF_LINK_URL ?? row.CONF_LINK_URL ?? row.LINK_URL,
-    vod_url: row.VOD_LINK_URL,
+    회의명: row.TITLE ?? row.COMM_NAME ?? row.CLASS_NAME,
+    회의일: row.CONF_DATE,
+    대수: row.DAE_NUM ?? row.ERACO,
+    안건: row.SUB_NAME,
+    회의록URL: row.PDF_LINK_URL ?? row.CONF_LINK_URL ?? row.LINK_URL,
+    영상URL: row.VOD_LINK_URL,
   };
 }
 
