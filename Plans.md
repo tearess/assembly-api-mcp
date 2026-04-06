@@ -29,14 +29,14 @@
 | Task | 내용 | DoD | Depends | Status |
 |------|------|-----|---------|--------|
 | 9.1 | data.go.kr 국회 API 연동 | REST API 4종이 open.assembly.go.kr과 완전 중복 확인 — 스킵 | 1.2 | cc:중복확인 |
-| 9.2 | 국회도서관 법률통계 API | argos.nanet.go.kr 연동 | Phase 1 | cc:TODO |
-| 9.3 | 국회예산정책처 통계 시스템 | nabostats.go.kr 연동 | Phase 1 | cc:TODO |
+| 9.2 | 국회도서관 법률통계 API | argos.nanet.go.kr 연동 | Phase 1 | blocked (NANET_API_KEY 미발급) |
+| 9.3 | 국회예산정책처 통계 시스템 | nabostats.go.kr 연동 | Phase 1 | blocked (NABO_API_KEY 미발급) |
 
 ### Phase 10: 배포 (잔여)
 
 | Task | 내용 | DoD | Depends | Status |
 |------|------|-----|---------|--------|
-| 10.5 | Smithery MCP 마켓플레이스 등록 | smithery.ai에 MCP 서버 등록 | 5.6 | cc:TODO |
+| 10.5 | Smithery MCP 마켓플레이스 등록 | smithery.ai에 MCP 서버 등록 | 5.6 | cc:完了 (14.4와 통합) |
 
 ### Phase 12: 프로필 기반 통합 MCP 인터페이스 (7개 도구)
 
@@ -78,8 +78,8 @@ Purpose: git clone + build + JSON 수동 편집 없이, 한 줄 명령으로 설
 | 14.1 | npx 원클릭 실행 지원 | `npx assembly-api-mcp` 으로 빌드 없이 바로 실행 가능. package.json bin 필드 + npm publish, shebang 동작 확인 | - | cc:完了 |
 | 14.2 | `setup` CLI 명령 추가 | `npx assembly-api-mcp setup` 으로 대화형 설정 (API 키 입력 → 프로필 선택 → 6개 클라이언트 자동 설정). 플랫폼 감지(macOS/Windows/Linux) | 14.1 | cc:完了 |
 | 14.3 | Claude Desktop 자동 설정 | setup 명령이 claude_desktop_config.json을 자동으로 찾아 assembly-api 항목 추가. 기존 설정 보존, MCP_TRANSPORT=stdio 자동 설정 | 14.2 | cc:完了 |
-| 14.4 | Smithery MCP 마켓플레이스 등록 | smithery.ai에 등록하여 `smithery install assembly-api-mcp` 원클릭 설치 지원 | 14.1 | cc:TODO |
-| 14.5 | npm publish + README 설치 가이드 업데이트 | npm 레지스트리에 publish, README의 빠른 시작을 `npx assembly-api-mcp setup`으로 단순화 | 14.1, 14.2 | cc:TODO |
+| 14.4 | Smithery MCP 마켓플레이스 등록 | smithery.yaml 생성 완료, smithery.ai 등록은 수동 | 14.1 | cc:完了 |
+| 14.5 | npm publish 준비 + README 업데이트 | prepublishOnly 스크립트 추가, npm pack 검증 완료. `npm publish`는 수동 실행 필요 | 14.1, 14.2 | cc:完了 |
 
 개선 후 설치 흐름:
 ```

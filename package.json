@@ -20,7 +20,8 @@
     "cli": "node --import tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
   },
   "repository": {
     "type": "git",
