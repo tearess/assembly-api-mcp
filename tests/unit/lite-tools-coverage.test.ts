@@ -712,7 +712,7 @@ describe("Lite get_schedule", () => {
     const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
       .calls[0]?.[0] as string;
     expect(calledUrl).toContain("ALLSCHEDULE");
-    expect(calledUrl).toContain("SCH_DT=20240601");
+    expect(calledUrl).toContain("SCH_DT=2024-06-01");
   });
 
   it("committee → CMIT_NM 파라미터 전달", async () => {

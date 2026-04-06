@@ -61,7 +61,7 @@ export function registerLiteScheduleTools(
 
         const hasDateRange = params.date_from && params.date_to;
         if (params.date_from && !hasDateRange) {
-          queryParams.SCH_DT = params.date_from.replace(/-/g, "");
+          queryParams.SCH_DT = params.date_from;
         }
         if (params.committee) {
           queryParams.CMIT_NM = params.committee;
@@ -80,11 +80,9 @@ export function registerLiteScheduleTools(
 
         // 날짜 범위 + 키워드 post-fetch 필터링
         if (params.date_from && params.date_to) {
-          const from = params.date_from.replace(/-/g, "");
-          const to = params.date_to.replace(/-/g, "");
           rows = rows.filter((row) => {
             const dt = String(row.SCH_DT ?? "");
-            return dt >= from && dt <= to;
+            return dt >= params.date_from! && dt <= params.date_to!;
           });
         }
         if (params.keyword) {
