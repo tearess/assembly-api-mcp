@@ -152,7 +152,7 @@ npx tsx src/cli.ts members --party 더불어민주당 --size 50
 
 ```bash
 # 의원별 인적사항 + 발의 법안 조회
-npx tsx src/cli.ts activity --name 고민정
+npx tsx src/cli.ts activity --name 박주민
 npx tsx src/cli.ts activity --name 이해민
 
 # 조회 건수 조절
@@ -171,7 +171,7 @@ npx tsx src/cli.ts bills --name 교육
 npx tsx src/cli.ts bills --bill-no 2204567
 
 # 제안자로 검색
-npx tsx src/cli.ts bills --proposer 고민정
+npx tsx src/cli.ts bills --proposer 안철수
 
 # 특정 대수 의안 검색 (기본: 22대)
 npx tsx src/cli.ts bills --name 환경 --age 21

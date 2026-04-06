@@ -13,3 +13,4 @@ coverage/
 _workspace/
 docs/test-scenarios.md
 .remember/
+.gstack/
