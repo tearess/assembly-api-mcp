@@ -792,6 +792,16 @@ export function buildNewsletterAppHtml(): string {
             <button id="addRecipientBtn" class="accent-btn" type="button">이메일 추가</button>
           </div>
           <div class="chip-list" id="recipientList"></div>
+          <div class="saved-preset-row">
+            <label>
+              수신자 그룹 이름
+              <input id="groupNameInput" type="text" placeholder="예: 정책팀 전체">
+            </label>
+            <button id="saveRecipientGroupBtn" class="ghost-btn" type="button">현재 수신자 그룹 저장</button>
+          </div>
+          <div class="saved-preset-list" id="savedRecipientGroupList">
+            <span class="subtle">저장된 수신자 그룹이 없습니다.</span>
+          </div>
 
           <label>
             메일 제목
@@ -886,6 +896,7 @@ export function buildNewsletterAppHtml(): string {
       selectedBillIds: new Set(),
       previewItemId: null,
       searchPresets: [],
+      recipientGroups: [],
       scheduleJobs: [],
       recipients: [],
       sendLogs: [],
@@ -906,6 +917,8 @@ export function buildNewsletterAppHtml(): string {
     const savedSearchList = document.getElementById("savedSearchList");
     const recipientInput = document.getElementById("recipientInput");
     const recipientList = document.getElementById("recipientList");
+    const groupNameInput = document.getElementById("groupNameInput");
+    const savedRecipientGroupList = document.getElementById("savedRecipientGroupList");
     const scheduleAtInput = document.getElementById("scheduleAtInput");
     const scheduleRecurrenceSelect = document.getElementById("scheduleRecurrenceSelect");
     const schedulePresetSelect = document.getElementById("schedulePresetSelect");
@@ -935,6 +948,7 @@ export function buildNewsletterAppHtml(): string {
     scheduleAtInput.value = getDefaultScheduleAtValue();
     scheduleRecurrenceSelect.value = "once";
     renderRecipients();
+    renderRecipientGroups();
     renderScheduleJobs();
     renderSendLogs();
     renderResults();
@@ -942,6 +956,7 @@ export function buildNewsletterAppHtml(): string {
     renderSearchPresets();
     renderSchedulePresetOptions();
     void loadSearchPresets();
+    void loadRecipientGroups();
     void loadSchedules();
     void loadRecipients();
     void loadSendLogs();
@@ -1023,6 +1038,17 @@ export function buildNewsletterAppHtml(): string {
       if (event.key === "Enter") {
         event.preventDefault();
         addRecipient();
+      }
+    });
+
+    document.getElementById("saveRecipientGroupBtn").addEventListener("click", async () => {
+      await saveRecipientGroup();
+    });
+
+    groupNameInput.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        await saveRecipientGroup();
       }
     });
 
@@ -1367,6 +1393,24 @@ export function buildNewsletterAppHtml(): string {
       }
     }
 
+    async function syncRecipients(recipients) {
+      const response = await fetch("/api/recipients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipients,
+          replace: true,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "수신자 목록 저장에 실패했습니다.");
+      }
+      state.recipients = (data.items || []).map((item) => item.email);
+      renderRecipients();
+      updateComposerStatus();
+    }
+
     function renderRecipients() {
       if (!state.recipients.length) {
         recipientList.innerHTML = '<span class="subtle">아직 추가된 이메일이 없습니다.</span>';
@@ -1394,6 +1438,133 @@ export function buildNewsletterAppHtml(): string {
           }
         });
       });
+    }
+
+    function renderRecipientGroups() {
+      if (!state.recipientGroups.length) {
+        savedRecipientGroupList.innerHTML = '<span class="subtle">저장된 수신자 그룹이 없습니다.</span>';
+        return;
+      }
+
+      savedRecipientGroupList.innerHTML = state.recipientGroups.map((group) => {
+        return '<div class="saved-preset-item">' +
+          '<div>' +
+          '<strong>' + escapeHtml(group.name) + '</strong>' +
+          '<div class="saved-preset-meta">' + escapeHtml(getRecipientGroupSummary(group)) + '</div>' +
+          '</div>' +
+          '<div class="saved-preset-actions">' +
+          '<button type="button" class="ghost-btn" data-load-group="' + escapeHtml(group.id) + '">불러오기</button>' +
+          '<button type="button" class="ghost-btn" data-append-group="' + escapeHtml(group.id) + '">추가하기</button>' +
+          '<button type="button" class="danger-btn" data-delete-group="' + escapeHtml(group.id) + '">삭제</button>' +
+          '</div>' +
+          '</div>';
+      }).join("");
+
+      savedRecipientGroupList.querySelectorAll("button[data-load-group]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await applyRecipientGroup(button.dataset.loadGroup, "replace");
+        });
+      });
+
+      savedRecipientGroupList.querySelectorAll("button[data-append-group]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await applyRecipientGroup(button.dataset.appendGroup, "append");
+        });
+      });
+
+      savedRecipientGroupList.querySelectorAll("button[data-delete-group]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await deleteRecipientGroup(button.dataset.deleteGroup);
+        });
+      });
+    }
+
+    function getRecipientGroupSummary(group) {
+      const previewEmails = (group.emails || []).slice(0, 3).join(", ");
+      const moreCount = Math.max((group.emails || []).length - 3, 0);
+      const extraLabel = moreCount > 0 ? " 외 " + moreCount + "명" : "";
+      const updatedAt = group.updatedAt ? " · 업데이트 " + group.updatedAt : "";
+      return (group.emails || []).length + "명 · " + (previewEmails || "이메일 없음") + extraLabel + updatedAt;
+    }
+
+    async function saveRecipientGroup() {
+      if (!groupNameInput.value.trim()) {
+        setStatus(composerStatus, "저장할 수신자 그룹 이름을 입력해 주세요.", "error");
+        return;
+      }
+      if (!state.recipients.length) {
+        setStatus(composerStatus, "저장할 수신자 이메일을 먼저 1개 이상 추가해 주세요.", "error");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/recipient-groups", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: groupNameInput.value.trim(),
+            recipients: state.recipients,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "수신자 그룹 저장에 실패했습니다.");
+        }
+
+        state.recipientGroups = data.items || [];
+        renderRecipientGroups();
+        groupNameInput.value = "";
+        setStatus(composerStatus, "수신자 그룹을 저장했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "수신자 그룹 저장에 실패했습니다.", "error");
+      }
+    }
+
+    async function applyRecipientGroup(id, mode) {
+      if (!id) return;
+
+      const group = state.recipientGroups.find((item) => item.id === id);
+      if (!group) {
+        setStatus(composerStatus, "선택한 수신자 그룹을 찾지 못했습니다.", "error");
+        return;
+      }
+
+      const nextRecipients = mode === "append"
+        ? Array.from(new Set([].concat(state.recipients || [], group.emails || [])))
+        : Array.from(group.emails || []);
+
+      try {
+        await syncRecipients(nextRecipients);
+        setStatus(
+          composerStatus,
+          mode === "append"
+            ? '수신자 그룹 "' + group.name + '"을 현재 목록에 추가했습니다.'
+            : '수신자 그룹 "' + group.name + '"으로 현재 목록을 불러왔습니다.',
+          "success",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "수신자 그룹 적용에 실패했습니다.", "error");
+      }
+    }
+
+    async function deleteRecipientGroup(id) {
+      if (!id) return;
+
+      try {
+        const response = await fetch("/api/recipient-groups?id=" + encodeURIComponent(id), {
+          method: "DELETE",
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "수신자 그룹 삭제에 실패했습니다.");
+        }
+
+        state.recipientGroups = data.items || [];
+        renderRecipientGroups();
+        setStatus(composerStatus, "수신자 그룹을 삭제했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "수신자 그룹 삭제에 실패했습니다.", "error");
+      }
     }
 
     function renderSendLogs() {
@@ -1932,6 +2103,20 @@ export function buildNewsletterAppHtml(): string {
         updateComposerStatus();
       } catch (error) {
         setStatus(composerStatus, error.message || "수신자 목록을 불러오지 못했습니다.", "error");
+      }
+    }
+
+    async function loadRecipientGroups() {
+      try {
+        const response = await fetch("/api/recipient-groups");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "수신자 그룹 목록을 불러오지 못했습니다.");
+        }
+        state.recipientGroups = data.items || [];
+        renderRecipientGroups();
+      } catch (error) {
+        savedRecipientGroupList.innerHTML = '<span class="subtle">' + escapeHtml(error.message || "수신자 그룹 목록을 불러오지 못했습니다.") + '</span>';
       }
     }
 

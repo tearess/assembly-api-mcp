@@ -11,12 +11,13 @@ import {
 import { createLegislationEnrichmentService } from "../newsletter/legislation-enricher.js";
 import { createLegislationSearchService } from "../newsletter/legislation-search.js";
 import {
-    RecipientStore,
-    SearchPresetStore,
-    ScheduledNewsletterJobStore,
-    SentNewsletterStore,
-    SendLogStore,
-  } from "../newsletter/persistence.js";
+  RecipientGroupStore,
+  RecipientStore,
+  SearchPresetStore,
+  ScheduledNewsletterJobStore,
+  SentNewsletterStore,
+  SendLogStore,
+} from "../newsletter/persistence.js";
 import {
   buildMarkdownFilename,
   renderNewsletterMarkdown,
@@ -62,7 +63,11 @@ export async function handleNewsletterRequest(
       const body = await readRequestBody(req);
       const recipients = normalizeRecipients(body.recipients ?? body.email);
       const store = new RecipientStore();
-      await store.upsertMany(recipients);
+      if (body.replace === true) {
+        await store.replaceAll(recipients);
+      } else {
+        await store.upsertMany(recipients);
+      }
       sendJson(res, 200, { items: await store.list() });
     } catch (error: unknown) {
       sendJson(res, 400, {
@@ -80,6 +85,52 @@ export async function handleNewsletterRequest(
       }
       const store = new RecipientStore();
       const deleted = await store.delete(email);
+      sendJson(res, 200, { deleted, items: await store.list() });
+    } catch (error: unknown) {
+      sendJson(res, 400, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/recipient-groups") {
+    try {
+      const store = new RecipientGroupStore();
+      sendJson(res, 200, { items: await store.list() });
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/recipient-groups") {
+    try {
+      const body = await readRequestBody(req);
+      const store = new RecipientGroupStore();
+      await store.upsert(
+        asString(body.name),
+        normalizeRecipients(body.recipients ?? body.emails),
+      );
+      sendJson(res, 200, { items: await store.list() });
+    } catch (error: unknown) {
+      sendJson(res, 400, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "DELETE" && pathname === "/api/recipient-groups") {
+    try {
+      const id = requestUrl.searchParams.get("id");
+      if (!id) {
+        throw new Error("삭제할 수신자 그룹 id가 필요합니다.");
+      }
+      const store = new RecipientGroupStore();
+      const deleted = await store.delete(id);
       sendJson(res, 200, { deleted, items: await store.list() });
     } catch (error: unknown) {
       sendJson(res, 400, {

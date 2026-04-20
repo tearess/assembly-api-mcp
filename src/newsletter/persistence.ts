@@ -85,6 +85,41 @@ export class RecipientStore {
     return results;
   }
 
+  async replaceAll(emails: readonly string[]): Promise<readonly RecipientRecord[]> {
+    const filePath = resolve(this.dataDir, RECIPIENTS_FILE);
+    const existingItems = await readJsonArray<RecipientRecord>(filePath);
+    const existingByEmail = new Map(
+      existingItems.map((item) => [normalizeEmail(item.email), item]),
+    );
+    const normalizedEmails = Array.from(
+      new Set(
+        emails
+          .map((email) => normalizeEmail(email))
+          .filter(Boolean),
+      ),
+    ).sort((left, right) => left.localeCompare(right));
+    const now = formatNowKst();
+    const nextItems = normalizedEmails.map<RecipientRecord>((email) => {
+      const existing = existingByEmail.get(email);
+      if (existing) {
+        return {
+          ...existing,
+          email,
+          updatedAt: now,
+        };
+      }
+
+      return {
+        email,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+
+    await writeJsonArray(filePath, nextItems);
+    return nextItems;
+  }
+
   async delete(email: string): Promise<boolean> {
     const normalizedEmail = normalizeEmail(email);
     const filePath = resolve(this.dataDir, RECIPIENTS_FILE);
@@ -121,7 +156,8 @@ export class RecipientGroupStore {
     const normalizedEmails = normalizeRecipientGroupEmails(emails);
     const now = formatNowKst();
     const filePath = resolve(this.dataDir, RECIPIENT_GROUPS_FILE);
-    const items = await readJsonArray<RecipientGroupRecord>(filePath);
+    const items = (await readJsonArray<RecipientGroupRecord>(filePath))
+      .map((item) => normalizeRecipientGroupRecord(item));
     const existing = items.find((item) =>
       item.name.localeCompare(normalizedName, undefined, { sensitivity: "accent" }) === 0
       || item.name.toLowerCase() === normalizedName.toLowerCase(),
@@ -137,7 +173,7 @@ export class RecipientGroupStore {
       };
       await writeJsonArray(
         filePath,
-        items.map((item) => item.id === existing.id ? record : normalizeRecipientGroupRecord(item)),
+        items.map((item) => item.id === existing.id ? record : item),
       );
       return record;
     }
@@ -150,7 +186,7 @@ export class RecipientGroupStore {
       updatedAt: now,
     };
 
-    await writeJsonArray(filePath, [...items.map((item) => normalizeRecipientGroupRecord(item)), record]);
+    await writeJsonArray(filePath, [...items, record]);
     return record;
   }
 
@@ -161,13 +197,14 @@ export class RecipientGroupStore {
     }
 
     const filePath = resolve(this.dataDir, RECIPIENT_GROUPS_FILE);
-    const items = await readJsonArray<RecipientGroupRecord>(filePath);
+    const items = (await readJsonArray<RecipientGroupRecord>(filePath))
+      .map((item) => normalizeRecipientGroupRecord(item));
     const filtered = items.filter((item) => item.id !== normalizedId);
     if (filtered.length === items.length) {
       return false;
     }
 
-    await writeJsonArray(filePath, filtered.map((item) => normalizeRecipientGroupRecord(item)));
+    await writeJsonArray(filePath, filtered);
     return true;
   }
 }
@@ -619,6 +656,47 @@ async function writeJsonArray<T>(
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function normalizeRecipientGroupRecord(item: RecipientGroupRecord): RecipientGroupRecord {
+  const createdAt = normalizeOptionalText(item.createdAt) ?? formatNowKst();
+
+  return {
+    id: normalizeOptionalText(item.id) ?? randomUUID(),
+    name: normalizeRecipientGroupName(item.name),
+    emails: normalizeRecipientGroupEmails(item.emails),
+    createdAt,
+    updatedAt: normalizeOptionalText(item.updatedAt) ?? createdAt,
+  };
+}
+
+function normalizeRecipientGroupName(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error("수신자 그룹 이름이 필요합니다.");
+  }
+  return normalized;
+}
+
+function normalizeRecipientGroupEmails(emails: readonly string[]): string[] {
+  if (!Array.isArray(emails)) {
+    throw new Error("수신자 그룹 이메일 목록이 올바르지 않습니다.");
+  }
+
+  const normalized = Array.from(
+    new Set(
+      emails
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => normalizeEmail(item))
+        .filter(Boolean),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+
+  if (normalized.length === 0) {
+    throw new Error("수신자 그룹에는 이메일이 1개 이상 필요합니다.");
+  }
+
+  return normalized;
 }
 
 function normalizeSendLogRecord(item: SendLogRecord): SendLogRecord {

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  RecipientGroupStore,
   RecipientStore,
   SearchPresetStore,
   ScheduledNewsletterJobStore,
@@ -91,6 +92,70 @@ describe("newsletter/persistence", () => {
       expect(deleted).toBe(true);
       const items = await store.list();
       expect(items.map((item) => item.email)).toEqual(["alpha@example.com"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("수신자 전체 목록을 교체할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new RecipientStore(dir);
+      await store.upsertMany(["alpha@example.com", "beta@example.com"]);
+      await store.replaceAll(["gamma@example.com", "beta@example.com"]);
+
+      const items = await store.list();
+      expect(items.map((item) => item.email)).toEqual([
+        "beta@example.com",
+        "gamma@example.com",
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("수신자 그룹을 저장하고 같은 이름이면 갱신한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new RecipientGroupStore(dir);
+      const first = await store.upsert("정책팀 전체", [
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+
+      const updated = await store.upsert("정책팀 전체", [
+        "beta@example.com",
+        "gamma@example.com",
+      ]);
+
+      expect(updated.id).toBe(first.id);
+      const items = await store.list();
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        id: first.id,
+        name: "정책팀 전체",
+        emails: ["beta@example.com", "gamma@example.com"],
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("수신자 그룹을 삭제할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new RecipientGroupStore(dir);
+      const group = await store.upsert("언론 대응", [
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+
+      const deleted = await store.delete(group.id);
+      expect(deleted).toBe(true);
+      expect(await store.list()).toEqual([]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
