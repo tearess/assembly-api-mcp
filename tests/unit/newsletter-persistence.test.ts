@@ -564,6 +564,108 @@ describe("newsletter/persistence", () => {
     }
   });
 
+  it("같은 조건의 예약 발송은 중복 등록하지 않는다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      await store.create(
+        {
+          ...createSendPayload(),
+          recipients: ["beta@example.com", "alpha@example.com"],
+          selectedBillIds: ["BILL_002", "BILL_001", "BILL_001"],
+        },
+        "2099-01-01T09:00",
+        "daily",
+      );
+
+      await expect(
+        store.create(
+          {
+            ...createSendPayload(),
+            recipients: ["alpha@example.com", "beta@example.com"],
+            selectedBillIds: ["BILL_001", "BILL_002"],
+          },
+          "2099-01-01T09:00",
+          "daily",
+        ),
+      ).rejects.toThrow(/같은 조건의 예약 발송이 이미 등록되어 있습니다/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("취소된 예약 발송은 같은 조건으로 다시 등록할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const first = await store.create(createSendPayload(), "2099-01-01T09:00", "weekly");
+      await store.cancel(first.id);
+
+      const recreated = await store.create(createSendPayload(), "2099-01-01T09:00", "weekly");
+      expect(recreated.id).not.toBe(first.id);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("대기 중 예약 발송의 시각과 반복 주기를 수정할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00", "once");
+
+      const updated = await store.update(job.id, "2099-01-03T08:30", "weekly");
+      expect(updated).toBe(true);
+
+      const items = await store.list();
+      expect(items[0]).toMatchObject({
+        id: job.id,
+        scheduledAt: "2099-01-02T23:30:00.000Z",
+        recurrence: "weekly",
+        status: "pending",
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("예약 수정 시 다른 활성 예약과 중복되면 막는다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const first = await store.create(createSendPayload(), "2099-01-01T09:00", "daily");
+      const second = await store.create(createSendPayload(), "2099-01-02T09:00", "daily");
+
+      await expect(store.update(second.id, "2099-01-01T09:00", "daily")).rejects.toThrow(
+        /같은 조건의 예약 발송이 이미 등록되어 있습니다/,
+      );
+      expect(first.id).not.toBe(second.id);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("처리 완료된 예약 발송은 수정할 수 없다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00");
+
+      await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      await store.markSent(job.id);
+
+      const updated = await store.update(job.id, "2099-01-02T09:00", "weekly");
+      expect(updated).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("반복 예약 발송은 성공 후 다음 시각으로 이동한다", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
 

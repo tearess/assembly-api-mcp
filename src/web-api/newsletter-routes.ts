@@ -8,7 +8,9 @@ import {
   resendNewsletterFromSnapshot,
   sendNewsletterFromPayload,
 } from "../newsletter/delivery.js";
+import { createLegislationDetailService } from "../newsletter/legislation-detail.js";
 import { createLegislationEnrichmentService } from "../newsletter/legislation-enricher.js";
+import { buildLegislationPreview } from "../newsletter/legislation-preview.js";
 import { createLegislationSearchService } from "../newsletter/legislation-search.js";
 import {
   exportNewsletterSettingsBundle,
@@ -55,6 +57,29 @@ export async function handleNewsletterRequest(
 
   if (req.method === "GET" && pathname === "/newsletter") {
     sendHtml(res, 200, buildNewsletterAppHtml());
+    return true;
+  }
+
+  if (req.method === "GET" && pathname.startsWith("/api/legislation/")) {
+    try {
+      const billId = decodeURIComponent(pathname.slice("/api/legislation/".length)).trim();
+      if (!billId || billId === "search") {
+        throw new Error("조회할 법안 id가 필요합니다.");
+      }
+
+      const detailService = createLegislationDetailService(config);
+      const detail = await detailService.getByBillId(billId);
+      if (!detail) {
+        sendJson(res, 404, { error: "법안 상세 정보를 찾지 못했습니다." });
+        return true;
+      }
+
+      sendJson(res, 200, detail);
+    } catch (error: unknown) {
+      sendJson(res, 400, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return true;
   }
 
@@ -434,6 +459,29 @@ export async function handleNewsletterRequest(
     return true;
   }
 
+  if (req.method === "PATCH" && pathname === "/api/newsletter/schedules") {
+    try {
+      const body = await readRequestBody(req);
+      const id = asString(body.id);
+      const scheduledAt = asString(body.scheduledAt);
+      const recurrence = toScheduledRecurrence(body.recurrence);
+      if (!id) {
+        throw new Error("수정할 예약 id가 필요합니다.");
+      }
+      const store = new ScheduledNewsletterJobStore();
+      const updated = await store.update(id, scheduledAt, recurrence);
+      sendJson(res, 200, {
+        updated,
+        items: await store.list(),
+      });
+    } catch (error: unknown) {
+      sendJson(res, 400, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
   if (req.method === "DELETE" && pathname === "/api/newsletter/schedules") {
     try {
       const id = requestUrl.searchParams.get("id");
@@ -621,10 +669,14 @@ export async function handleNewsletterRequest(
       const enrichmentService = createLegislationEnrichmentService(config);
       const result = await searchService.search(query);
       const enrichedItems = await enrichmentService.enrichItems(result.items);
+      const previewItems = enrichedItems.map((item) => ({
+        ...item,
+        preview: buildLegislationPreview(item),
+      }));
 
       sendJson(res, 200, {
         ...result,
-        items: enrichedItems,
+        items: previewItems,
       });
     } catch (error: unknown) {
       sendJson(res, 400, {

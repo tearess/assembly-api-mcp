@@ -490,6 +490,56 @@ export function buildNewsletterAppHtml(): string {
       line-height: 1.7;
     }
 
+    .preview-section-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .preview-section {
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: rgba(24, 53, 47, 0.04);
+      border: 1px solid rgba(24, 53, 47, 0.08);
+    }
+
+    .preview-section h4 {
+      margin: 0 0 8px;
+      font-size: 0.92rem;
+    }
+
+    .preview-section p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+
+    .inline-row-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .mini-action-btn {
+      appearance: none;
+      border: 1px solid rgba(24, 53, 47, 0.14);
+      background: rgba(24, 53, 47, 0.04);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .mini-action-btn:hover {
+      border-color: rgba(15, 118, 98, 0.28);
+      background: rgba(15, 118, 98, 0.08);
+      color: var(--accent);
+    }
+
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -678,6 +728,82 @@ export function buildNewsletterAppHtml(): string {
       padding: 0;
     }
 
+    .detail-modal-body {
+      padding: 22px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .detail-lead {
+      color: var(--muted);
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .detail-card {
+      border-radius: 18px;
+      padding: 14px 16px;
+      background: rgba(24, 53, 47, 0.04);
+      border: 1px solid rgba(24, 53, 47, 0.08);
+    }
+
+    .detail-card .label {
+      color: var(--muted);
+      font-size: 0.76rem;
+      margin-bottom: 6px;
+    }
+
+    .detail-card .value {
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    .detail-section-card {
+      border-radius: 20px;
+      padding: 18px;
+      background: rgba(255, 250, 242, 0.96);
+      border: 1px solid rgba(24, 53, 47, 0.08);
+    }
+
+    .detail-section-card h4 {
+      margin: 0 0 10px;
+    }
+
+    .detail-section-card p {
+      margin: 0;
+      line-height: 1.8;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .timeline-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .timeline-item {
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: rgba(24, 53, 47, 0.03);
+      border: 1px solid rgba(24, 53, 47, 0.08);
+    }
+
+    .timeline-item strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .timeline-item .subtle {
+      line-height: 1.6;
+    }
+
     iframe {
       width: 100%;
       height: 70vh;
@@ -858,13 +984,21 @@ export function buildNewsletterAppHtml(): string {
           <div id="previewContent" hidden>
             <h3 id="previewTitle"></h3>
             <div class="preview-meta">
+              <div class="preview-box"><div class="label">의안번호</div><div class="value" id="previewBillNo"></div></div>
               <div class="preview-box"><div class="label">발의 의원</div><div class="value" id="previewProposer"></div></div>
               <div class="preview-box"><div class="label">소관 상임위</div><div class="value" id="previewCommittee"></div></div>
               <div class="preview-box"><div class="label">현재 단계</div><div class="value" id="previewStage"></div></div>
+              <div class="preview-box"><div class="label">입법예고 상태</div><div class="value" id="previewNoticeStatus"></div></div>
               <div class="preview-box"><div class="label">입법예고 종료일</div><div class="value" id="previewEndDate"></div></div>
+              <div class="preview-box"><div class="label">제안일</div><div class="value" id="previewProposalDate"></div></div>
+              <div class="preview-box"><div class="label">관련도</div><div class="value" id="previewRelevance"></div></div>
             </div>
             <div class="summary-block" id="previewSummary"></div>
-            <p class="subtle" style="margin-top: 14px;">
+            <div class="preview-section-list" id="previewSections"></div>
+            <div class="inline-row-actions">
+              <button id="openPreviewDetailBtn" class="mini-action-btn" type="button">상세 보기</button>
+            </div>
+            <p class="subtle" style="margin-top: 12px;">
               <a id="previewLink" href="#" target="_blank" rel="noreferrer">원문 보기</a>
             </p>
           </div>
@@ -952,6 +1086,11 @@ export function buildNewsletterAppHtml(): string {
             </label>
             <button id="scheduleSelectedBtn" class="ghost-btn" type="button">선택 항목 예약</button>
             <button id="scheduleAllBtn" class="ghost-btn" type="button">전체 결과 예약</button>
+          </div>
+          <div id="scheduleEditStatus" class="status-line" hidden></div>
+          <div id="scheduleEditActions" class="saved-preset-actions" style="justify-content: flex-start; margin-top: 10px;" hidden>
+            <button id="updateScheduleBtn" class="accent-btn" type="button">예약 수정 저장</button>
+            <button id="cancelScheduleEditBtn" class="ghost-btn" type="button">편집 취소</button>
           </div>
           <label style="display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; color: #395954; font-size: 0.94rem;">
             <input id="scheduleOnlyNewInput" type="checkbox">
@@ -1061,6 +1200,20 @@ export function buildNewsletterAppHtml(): string {
     </div>
   </div>
 
+  <div class="modal" id="billDetailModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>법안 상세 보기</strong>
+        <button id="closeBillDetailModalBtn" class="danger-btn" type="button">닫기</button>
+      </div>
+      <div class="modal-body">
+        <div id="billDetailContent" class="detail-modal-body">
+          <div class="subtle">법안 상세 정보를 불러오는 중입니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const DEFAULT_PAGE_SIZE = 20;
 
@@ -1079,6 +1232,7 @@ export function buildNewsletterAppHtml(): string {
       total: 0,
       totalPages: 1,
       itemCache: new Map(),
+      detailCache: new Map(),
       selectedBillIds: new Set(),
       previewItemId: null,
       searchPresets: [],
@@ -1088,6 +1242,7 @@ export function buildNewsletterAppHtml(): string {
       subscriptionFilterText: "",
       subscriptionFilterStatus: "all",
       scheduleJobs: [],
+      editingScheduleId: "",
       scheduleRunLogs: [],
       scheduleRunFilterJobId: "",
       scheduleRunFilterText: "",
@@ -1122,6 +1277,12 @@ export function buildNewsletterAppHtml(): string {
     const scheduleRecurrenceSelect = document.getElementById("scheduleRecurrenceSelect");
     const schedulePresetSelect = document.getElementById("schedulePresetSelect");
     const scheduleOnlyNewInput = document.getElementById("scheduleOnlyNewInput");
+    const scheduleSelectedBtn = document.getElementById("scheduleSelectedBtn");
+    const scheduleAllBtn = document.getElementById("scheduleAllBtn");
+    const scheduleEditStatus = document.getElementById("scheduleEditStatus");
+    const scheduleEditActions = document.getElementById("scheduleEditActions");
+    const updateScheduleBtn = document.getElementById("updateScheduleBtn");
+    const cancelScheduleEditBtn = document.getElementById("cancelScheduleEditBtn");
     const subscriptionNameInput = document.getElementById("subscriptionNameInput");
     const subscriptionFilterInput = document.getElementById("subscriptionFilterInput");
     const subscriptionFilterSelect = document.getElementById("subscriptionFilterSelect");
@@ -1147,14 +1308,22 @@ export function buildNewsletterAppHtml(): string {
     const previewEmpty = document.getElementById("previewEmpty");
     const previewContent = document.getElementById("previewContent");
     const previewTitle = document.getElementById("previewTitle");
+    const previewBillNo = document.getElementById("previewBillNo");
     const previewProposer = document.getElementById("previewProposer");
     const previewCommittee = document.getElementById("previewCommittee");
     const previewStage = document.getElementById("previewStage");
+    const previewNoticeStatus = document.getElementById("previewNoticeStatus");
     const previewEndDate = document.getElementById("previewEndDate");
+    const previewProposalDate = document.getElementById("previewProposalDate");
+    const previewRelevance = document.getElementById("previewRelevance");
     const previewSummary = document.getElementById("previewSummary");
+    const previewSections = document.getElementById("previewSections");
     const previewLink = document.getElementById("previewLink");
+    const openPreviewDetailBtn = document.getElementById("openPreviewDetailBtn");
     const previewModal = document.getElementById("previewModal");
     const previewFrame = document.getElementById("previewFrame");
+    const billDetailModal = document.getElementById("billDetailModal");
+    const billDetailContent = document.getElementById("billDetailContent");
 
     applyPreset("1m");
     noticeScopeSelect.value = state.query.noticeScope;
@@ -1352,6 +1521,15 @@ export function buildNewsletterAppHtml(): string {
       await openHtmlPreview();
     });
 
+    openPreviewDetailBtn.addEventListener("click", async () => {
+      const item = state.items.find((entry) => entry.billId === state.previewItemId) || state.items[0];
+      if (!item) {
+        setStatus(searchStatus, "상세 정보를 볼 법안을 먼저 선택해 주세요.", "error");
+        return;
+      }
+      await openBillDetail(item.billId);
+    });
+
     document.getElementById("sendSelectedBtn").addEventListener("click", async () => {
       await sendNewsletter(false);
     });
@@ -1368,17 +1546,29 @@ export function buildNewsletterAppHtml(): string {
       await downloadMarkdown(true);
     });
 
-    document.getElementById("scheduleSelectedBtn").addEventListener("click", async () => {
+    scheduleSelectedBtn.addEventListener("click", async () => {
       await scheduleNewsletter(false);
     });
 
-    document.getElementById("scheduleAllBtn").addEventListener("click", async () => {
+    scheduleAllBtn.addEventListener("click", async () => {
       await scheduleNewsletter(true);
+    });
+
+    updateScheduleBtn.addEventListener("click", async () => {
+      await saveScheduleEdit();
+    });
+
+    cancelScheduleEditBtn.addEventListener("click", () => {
+      cancelScheduleEdit();
     });
 
     document.getElementById("closeModalBtn").addEventListener("click", () => {
       previewModal.classList.remove("open");
       previewFrame.srcdoc = "";
+    });
+
+    document.getElementById("closeBillDetailModalBtn").addEventListener("click", () => {
+      billDetailModal.classList.remove("open");
     });
 
     function applyPreset(preset) {
@@ -1738,6 +1928,20 @@ export function buildNewsletterAppHtml(): string {
       return "직접 지정";
     }
 
+    function getPreviewNoticeStatusLabel(value) {
+      return value === "closed" ? "입법예고 종료" : "입법예고 진행중";
+    }
+
+    function getPreviewRelevanceLabel(score) {
+      if (typeof score !== "number" || !Number.isFinite(score) || score <= 0) {
+        return "관련도 정보 없음";
+      }
+      if (score >= 0.9) return "매우 높음 (" + score.toFixed(2) + ")";
+      if (score >= 0.7) return "높음 (" + score.toFixed(2) + ")";
+      if (score >= 0.4) return "보통 (" + score.toFixed(2) + ")";
+      return "낮음 (" + score.toFixed(2) + ")";
+    }
+
     function startNewSearch() {
       syncQueryFromInputs();
       state.query.page = 1;
@@ -1745,6 +1949,7 @@ export function buildNewsletterAppHtml(): string {
       state.totalPages = 1;
       state.items = [];
       state.itemCache.clear();
+      state.detailCache.clear();
       state.selectedBillIds.clear();
       state.previewItemId = null;
       renderResults();
@@ -1831,7 +2036,8 @@ export function buildNewsletterAppHtml(): string {
         const active = state.previewItemId === item.billId ? "active" : "";
         return '<tr class="' + active + '" data-bill-id="' + escapeHtml(item.billId) + '">' +
           '<td><input type="checkbox" data-select-id="' + escapeHtml(item.billId) + '" ' + checked + '></td>' +
-          '<td><strong>' + escapeHtml(item.billName) + '</strong><div class="subtle">의안번호 ' + escapeHtml(item.billNo || "미상") + '</div></td>' +
+          '<td><strong>' + escapeHtml(item.billName) + '</strong><div class="subtle">의안번호 ' + escapeHtml(item.billNo || "미상") + '</div>' +
+          '<div class="inline-row-actions"><button type="button" class="mini-action-btn" data-open-bill-detail="' + escapeHtml(item.billId) + '">상세 보기</button></div></td>' +
           '<td>' + escapeHtml(item.proposer || "미상") + '</td>' +
           '<td>' + escapeHtml(item.committee || "미상") + '</td>' +
           '<td><span class="stage-pill">' + escapeHtml(item.stageLabel) + '</span></td>' +
@@ -1862,6 +2068,13 @@ export function buildNewsletterAppHtml(): string {
           updateComposerStatus();
         });
       });
+
+      resultsBody.querySelectorAll("button[data-open-bill-detail]").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          await openBillDetail(button.dataset.openBillDetail || "");
+        });
+      });
     }
 
     function renderPagination() {
@@ -1875,19 +2088,122 @@ export function buildNewsletterAppHtml(): string {
       if (!item) {
         previewEmpty.hidden = false;
         previewContent.hidden = true;
+        openPreviewDetailBtn.disabled = true;
         return;
       }
 
       previewEmpty.hidden = true;
       previewContent.hidden = false;
+      openPreviewDetailBtn.disabled = false;
+      const preview = item.preview || {};
       previewTitle.textContent = item.billName;
+      previewBillNo.textContent = preview.billNo || item.billNo || "미상";
       previewProposer.textContent = item.proposer || "미상";
       previewCommittee.textContent = item.committee || "미상";
       previewStage.textContent = item.stageLabel;
+      previewNoticeStatus.textContent = preview.noticeStatusLabel || getPreviewNoticeStatusLabel(item.noticeStatus);
       previewEndDate.textContent = item.noticeEndDate || "미상";
-      previewSummary.textContent = item.summary || "상세 요약 정보가 아직 수집되지 않았습니다.";
+      previewProposalDate.textContent = preview.proposalDate || "미상";
+      previewRelevance.textContent = preview.relevanceLabel || getPreviewRelevanceLabel(item.relevanceScore);
+      previewSummary.textContent = preview.summary || item.summary || "상세 요약 정보가 아직 수집되지 않았습니다.";
+      const previewSectionsData = Array.isArray(preview.sections) ? preview.sections : [];
+      previewSections.innerHTML = previewSectionsData.length
+        ? previewSectionsData.map((section) =>
+          '<section class="preview-section">' +
+            '<h4>' + escapeHtml(section.title || "상세") + '</h4>' +
+            '<p>' + escapeHtml(section.content || "") + '</p>' +
+          '</section>'
+        ).join("")
+        : '<div class="subtle">제안이유나 주요내용은 원문 링크에서 추가 확인할 수 있습니다.</div>';
       previewLink.href = item.detailUrl || "#";
       previewLink.textContent = item.detailUrl ? "원문 보기" : "원문 링크 없음";
+    }
+
+    async function openBillDetail(billId) {
+      try {
+        if (!billId) {
+          throw new Error("상세 조회할 법안 id가 없습니다.");
+        }
+
+        billDetailModal.classList.add("open");
+        billDetailContent.innerHTML = '<div class="subtle">법안 상세 정보를 불러오는 중입니다.</div>';
+        let detail = state.detailCache.get(billId);
+
+        if (!detail) {
+          const response = await fetch("/api/legislation/" + encodeURIComponent(billId));
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "법안 상세 정보를 불러오지 못했습니다.");
+          }
+          detail = data;
+          state.detailCache.set(billId, detail);
+        }
+
+        billDetailContent.innerHTML = renderBillDetail(detail);
+      } catch (error) {
+        billDetailContent.innerHTML = '<div class="subtle">' + escapeHtml(error.message || "법안 상세 정보를 불러오지 못했습니다.") + '</div>';
+      }
+    }
+
+    function renderBillDetail(detail) {
+      const item = detail && detail.item ? detail.item : {};
+      const preview = detail && detail.preview ? detail.preview : {};
+      const previewSectionsData = Array.isArray(preview.sections) ? preview.sections : [];
+      const reviewEvents = Array.isArray(detail && detail.reviewEvents) ? detail.reviewEvents : [];
+      const historyEvents = Array.isArray(detail && detail.historyEvents) ? detail.historyEvents : [];
+
+      return [
+        '<div>',
+        '<h3 style="margin: 0 0 8px;">' + escapeHtml(item.billName || "법안 상세") + '</h3>',
+        '<p class="detail-lead">' + escapeHtml(preview.summary || item.summary || "상세 요약 정보가 아직 수집되지 않았습니다.") + '</p>',
+        '</div>',
+        '<div class="detail-grid">',
+        createDetailCard("의안번호", preview.billNo || item.billNo || "미상"),
+        createDetailCard("발의 의원", item.proposer || "미상"),
+        createDetailCard("소관 상임위", item.committee || "미상"),
+        createDetailCard("현재 단계", item.stageLabel || "미상"),
+        createDetailCard("입법예고 상태", preview.noticeStatusLabel || getPreviewNoticeStatusLabel(item.noticeStatus)),
+        createDetailCard("입법예고 종료일", item.noticeEndDate || "미상"),
+        createDetailCard("제안일", preview.proposalDate || "미상"),
+        createDetailCard("관련도", preview.relevanceLabel || getPreviewRelevanceLabel(item.relevanceScore)),
+        '</div>',
+        previewSectionsData.length
+          ? previewSectionsData.map((section) =>
+            '<section class="detail-section-card">' +
+              '<h4>' + escapeHtml(section.title || "상세") + '</h4>' +
+              '<p>' + escapeHtml(section.content || "") + '</p>' +
+            '</section>'
+          ).join("")
+          : '<section class="detail-section-card"><h4>상세 안내</h4><p>추가 본문 정보가 없어서 요약만 표시합니다.</p></section>',
+        '<section class="detail-section-card"><h4>심사 이력</h4>' + renderTimeline(reviewEvents, "아직 확인된 심사 이력이 없습니다.") + '</section>',
+        '<section class="detail-section-card"><h4>접수/처리 이력</h4>' + renderTimeline(historyEvents, "아직 확인된 접수/처리 이력이 없습니다.") + '</section>',
+        item.detailUrl
+          ? '<div class="inline-row-actions"><a class="mini-action-btn" href="' + escapeHtml(item.detailUrl) + '" target="_blank" rel="noreferrer">원문 열기</a></div>'
+          : '<div class="subtle">원문 링크가 없습니다.</div>',
+      ].join("");
+    }
+
+    function renderTimeline(items, emptyMessage) {
+      if (!items.length) {
+        return '<div class="subtle">' + escapeHtml(emptyMessage) + '</div>';
+      }
+
+      return '<div class="timeline-list">' + items.map((entry) =>
+        '<div class="timeline-item">' +
+          '<strong>' + escapeHtml(entry.label || "이력") + '</strong>' +
+          '<div class="subtle">' +
+            escapeHtml(entry.date || "날짜 미상") +
+            (entry.detail ? ' · ' + escapeHtml(entry.detail) : "") +
+          '</div>' +
+        '</div>'
+      ).join("") + '</div>';
+    }
+
+    function createDetailCard(label, value) {
+      return '<div class="detail-card">' +
+        '<div class="label">' + escapeHtml(label) + '</div>' +
+        '<div class="value">' + escapeHtml(value) + '</div>' +
+      '</div>';
     }
 
     async function exportSettingsBundle() {
@@ -2367,8 +2683,16 @@ export function buildNewsletterAppHtml(): string {
     }
 
     function renderScheduleJobs() {
+      if (state.editingScheduleId) {
+        const editingJob = state.scheduleJobs.find((item) => item.id === state.editingScheduleId);
+        if (!editingJob || !isScheduleEditable(editingJob)) {
+          clearScheduleEditState();
+        }
+      }
+
       if (!state.scheduleJobs.length) {
         scheduleList.innerHTML = '<span class="subtle">예약된 발송 작업이 없습니다.</span>';
+        renderScheduleEditor();
         return;
       }
 
@@ -2388,6 +2712,13 @@ export function buildNewsletterAppHtml(): string {
             escapeHtml(state.scheduleRunFilterJobId === job.id ? "이력 보는 중" : "이력 보기") +
           '</button>',
         );
+        if (isScheduleEditable(job)) {
+          actionButtons.push(
+            '<button type="button" class="ghost-btn" data-edit-schedule="' + escapeHtml(job.id) + '">' +
+              escapeHtml(state.editingScheduleId === job.id ? "편집 중" : "예약 수정") +
+            '</button>',
+          );
+        }
         if (job.status === "pending") {
           actionButtons.push(
             '<button type="button" class="ghost-btn" data-pause-schedule="' + escapeHtml(job.id) + '">일시정지</button>',
@@ -2448,6 +2779,12 @@ export function buildNewsletterAppHtml(): string {
         });
       });
 
+      scheduleList.querySelectorAll("button[data-edit-schedule]").forEach((button) => {
+        button.addEventListener("click", () => {
+          beginScheduleEdit(button.dataset.editSchedule || "");
+        });
+      });
+
       scheduleList.querySelectorAll("button[data-resume-schedule]").forEach((button) => {
         button.addEventListener("click", async () => {
           await resumeScheduledJob(button.dataset.resumeSchedule);
@@ -2459,6 +2796,73 @@ export function buildNewsletterAppHtml(): string {
           await cancelScheduledJob(button.dataset.cancelSchedule);
         });
       });
+
+      renderScheduleEditor();
+    }
+
+    function isScheduleEditable(job) {
+      return job && (job.status === "pending" || job.status === "paused" || job.status === "failed");
+    }
+
+    function beginScheduleEdit(id) {
+      if (!id) return;
+
+      const job = state.scheduleJobs.find((item) => item.id === id);
+      if (!job || !isScheduleEditable(job)) {
+        setStatus(composerStatus, "대기 중, 일시정지, 실패 상태의 예약만 수정할 수 있습니다.", "error");
+        return;
+      }
+
+      state.editingScheduleId = id;
+      scheduleAtInput.value = toScheduleInputValue(job.scheduledAt);
+      scheduleRecurrenceSelect.value = job.recurrence || "once";
+      renderScheduleEditor();
+      setStatus(
+        composerStatus,
+        '"' + (job.payload.subject || "입법예고 뉴스레터") + '" 예약 편집 모드로 전환했습니다.',
+        "success",
+      );
+    }
+
+    function clearScheduleEditState() {
+      state.editingScheduleId = "";
+    }
+
+    function cancelScheduleEdit() {
+      clearScheduleEditState();
+      scheduleAtInput.value = getDefaultScheduleAtValue();
+      scheduleRecurrenceSelect.value = "once";
+      renderScheduleEditor();
+      renderScheduleJobs();
+      setStatus(composerStatus, "예약 편집을 취소했습니다.", "success");
+    }
+
+    function renderScheduleEditor() {
+      const job = state.editingScheduleId
+        ? state.scheduleJobs.find((item) => item.id === state.editingScheduleId)
+        : null;
+
+      if (!job || !isScheduleEditable(job)) {
+        scheduleEditStatus.hidden = true;
+        scheduleEditActions.hidden = true;
+        scheduleSelectedBtn.disabled = false;
+        scheduleAllBtn.disabled = false;
+        schedulePresetSelect.disabled = false;
+        scheduleOnlyNewInput.disabled = false;
+        return;
+      }
+
+      setStatus(
+        scheduleEditStatus,
+        '"' + (job.payload.subject || "입법예고 뉴스레터") + '" 예약을 편집하는 중입니다. 아래 저장을 누르면 예약 시각과 반복 주기만 변경됩니다.',
+        "success",
+      );
+      scheduleEditStatus.hidden = false;
+      scheduleEditActions.hidden = false;
+      scheduleSelectedBtn.disabled = true;
+      scheduleAllBtn.disabled = true;
+      schedulePresetSelect.disabled = true;
+      scheduleOnlyNewInput.disabled = true;
     }
 
     function renderScheduleRuns() {
@@ -2607,6 +3011,23 @@ export function buildNewsletterAppHtml(): string {
         minute: "2-digit",
         hour12: false,
       }).format(date);
+    }
+
+    function toScheduleInputValue(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return getDefaultScheduleAtValue();
+      }
+
+      return new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(date).replace(" ", "T");
     }
 
     function getScheduleStatusLabel(status) {
@@ -2850,6 +3271,9 @@ export function buildNewsletterAppHtml(): string {
 
     async function scheduleNewsletter(includeAll) {
       try {
+        if (state.editingScheduleId) {
+          throw new Error("예약 편집을 먼저 저장하거나 취소한 뒤 새 예약을 등록해 주세요.");
+        }
         if (!includeAll && state.selectedBillIds.size === 0) {
           throw new Error("선택 항목 예약 발송은 법안을 1건 이상 선택해야 합니다.");
         }
@@ -2888,6 +3312,45 @@ export function buildNewsletterAppHtml(): string {
         );
       } catch (error) {
         setStatus(composerStatus, error.message || "예약 발송 등록에 실패했습니다.", "error");
+      }
+    }
+
+    async function saveScheduleEdit() {
+      try {
+        if (!state.editingScheduleId) {
+          throw new Error("수정할 예약을 먼저 선택해 주세요.");
+        }
+        if (!scheduleAtInput.value) {
+          throw new Error("예약 발송 시각을 입력해 주세요.");
+        }
+
+        const response = await fetch("/api/newsletter/schedules", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: state.editingScheduleId,
+            scheduledAt: scheduleAtInput.value,
+            recurrence: scheduleRecurrenceSelect.value,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "예약 수정에 실패했습니다.");
+        }
+        if (!data.updated) {
+          throw new Error("대기 중, 일시정지, 실패 상태의 예약만 수정할 수 있습니다.");
+        }
+
+        state.scheduleJobs = data.items || [];
+        clearScheduleEditState();
+        scheduleAtInput.value = getDefaultScheduleAtValue();
+        scheduleRecurrenceSelect.value = "once";
+        renderScheduleJobs();
+        await loadSubscriptionActivities();
+        await loadOperationalSummary();
+        setStatus(composerStatus, "예약 시각과 반복 주기를 수정했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "예약 수정에 실패했습니다.", "error");
       }
     }
 

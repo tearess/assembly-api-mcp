@@ -29,6 +29,12 @@ const NEWSLETTER_SUBSCRIPTIONS_FILE = "newsletter-subscriptions.json";
 const SCHEDULED_JOBS_FILE = "scheduled-jobs.json";
 const SENT_SNAPSHOTS_DIR = "sent-newsletters";
 const SETTINGS_BUNDLE_VERSION = 1;
+const ACTIVE_DUPLICATE_SCHEDULE_STATUSES = new Set([
+  "pending",
+  "processing",
+  "paused",
+  "failed",
+]);
 
 export function resolveNewsletterDataDir(
   env: NodeJS.ProcessEnv = process.env,
@@ -624,13 +630,25 @@ export class ScheduledNewsletterJobStore {
   ): Promise<ScheduledNewsletterJobRecord> {
     const filePath = resolve(this.dataDir, SCHEDULED_JOBS_FILE);
     const items = await readScheduledJobArray(filePath);
+    const normalizedScheduledAt = normalizeScheduledAt(scheduledAt);
+    const normalizedRecurrence = normalizeRecurrence(recurrence);
+    const normalizedPayload = normalizeNewsletterSendPayload(payload);
+    const duplicate = findDuplicateScheduledJob(
+      items,
+      normalizedPayload,
+      normalizedScheduledAt,
+      normalizedRecurrence,
+    );
+    if (duplicate) {
+      throw new Error(buildDuplicateScheduledJobErrorMessage(duplicate));
+    }
     const now = formatNowKst();
     const record: ScheduledNewsletterJobRecord = {
       id: randomUUID(),
-      scheduledAt: normalizeScheduledAt(scheduledAt),
-      recurrence: normalizeRecurrence(recurrence),
+      scheduledAt: normalizedScheduledAt,
+      recurrence: normalizedRecurrence,
       status: "pending",
-      payload: normalizeNewsletterSendPayload(payload),
+      payload: normalizedPayload,
       deliveredBillIds: [],
       createdAt: now,
       updatedAt: now,
@@ -642,6 +660,63 @@ export class ScheduledNewsletterJobStore {
 
     await writeJsonArray(filePath, [record, ...items].slice(0, 300));
     return record;
+  }
+
+  async update(
+    id: string,
+    scheduledAt: string,
+    recurrence: ScheduledNewsletterRecurrence = "once",
+  ): Promise<boolean> {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      throw new Error("수정할 예약 id가 필요합니다.");
+    }
+
+    const filePath = resolve(this.dataDir, SCHEDULED_JOBS_FILE);
+    const items = await readScheduledJobArray(filePath);
+    const current = items.find((item) => item.id === normalizedId);
+    if (!current) {
+      return false;
+    }
+
+    if (current.status !== "pending" && current.status !== "paused" && current.status !== "failed") {
+      return false;
+    }
+
+    const normalizedScheduledAt = normalizeScheduledAt(scheduledAt);
+    const normalizedRecurrence = normalizeRecurrence(recurrence);
+    const duplicate = findDuplicateScheduledJob(
+      items,
+      current.payload,
+      normalizedScheduledAt,
+      normalizedRecurrence,
+      normalizedId,
+    );
+    if (duplicate) {
+      throw new Error(buildDuplicateScheduledJobErrorMessage(duplicate));
+    }
+
+    if (
+      current.scheduledAt === normalizedScheduledAt
+      && current.recurrence === normalizedRecurrence
+    ) {
+      return true;
+    }
+
+    const now = formatNowKst();
+    const next = items.map((item) =>
+      item.id === normalizedId
+        ? {
+            ...item,
+            scheduledAt: normalizedScheduledAt,
+            recurrence: normalizedRecurrence,
+            updatedAt: now,
+          }
+        : item,
+    );
+
+    await writeJsonArray(filePath, next);
+    return true;
   }
 
   async cancel(id: string): Promise<boolean> {
@@ -1157,11 +1232,30 @@ function isSentNewsletterSnapshotRecord(value: unknown): value is SentNewsletter
     && record["document"] !== null;
 }
 
-function normalizeSortBy(value: SavedSearchPresetQuery["sortBy"]): SavedSearchPresetQuery["sortBy"] {
+function normalizeSortBy(
+  value: SavedSearchPresetQuery["sortBy"] | undefined,
+): SavedSearchPresetQuery["sortBy"] {
   if (value === "notice_end_desc" || value === "notice_end_asc") {
     return value;
   }
   return "relevance";
+}
+
+function normalizeDatePreset(
+  value: NewsletterSendPayload["query"]["datePreset"],
+): NonNullable<NewsletterSendPayload["query"]["datePreset"]> {
+  if (
+    value === "6m"
+    || value === "3m"
+    || value === "1m"
+    || value === "3w"
+    || value === "2w"
+    || value === "1w"
+    || value === "custom"
+  ) {
+    return value;
+  }
+  return "1m";
 }
 
 function clampPageSize(value: number | null | undefined): number {
@@ -1179,13 +1273,40 @@ function normalizeNonNegativeInteger(value: number | null | undefined): number {
   return Math.max(0, Math.trunc(value));
 }
 
+function normalizePositiveInteger(
+  value: number | null | undefined,
+  fallback: number,
+): number {
+  const normalized = normalizeNonNegativeInteger(value);
+  return normalized > 0 ? normalized : fallback;
+}
+
+function normalizeScheduledJobQuery(
+  query: NewsletterSendPayload["query"],
+  includeAllResults = false,
+): NewsletterSendPayload["query"] {
+  const source = query ?? {};
+  const datePreset = normalizeDatePreset(source.datePreset);
+
+  return {
+    keyword: normalizeOptionalText(source.keyword) ?? undefined,
+    datePreset,
+    dateFrom: datePreset === "custom" ? normalizeOptionalDate(source.dateFrom) ?? undefined : undefined,
+    dateTo: datePreset === "custom" ? normalizeOptionalDate(source.dateTo) ?? undefined : undefined,
+    noticeScope: source.noticeScope === "active_only" ? "active_only" : "include_closed",
+    sortBy: normalizeSortBy(source.sortBy),
+    page: includeAllResults ? 1 : normalizePositiveInteger(source.page, 1),
+    pageSize: includeAllResults ? undefined : clampPageSize(source.pageSize),
+  };
+}
+
 function normalizeNewsletterSendPayload(
   payload: NewsletterSendPayload,
 ): NewsletterSendPayload {
   return {
-    query: payload.query ?? {},
+    query: normalizeScheduledJobQuery(payload.query, payload.includeAllResults === true),
     items: Array.isArray(payload.items) ? payload.items : [],
-    selectedBillIds: Array.isArray(payload.selectedBillIds) ? payload.selectedBillIds : [],
+    selectedBillIds: normalizeBillIdList(payload.selectedBillIds),
     subject: normalizeOptionalText(payload.subject),
     introText: normalizeOptionalText(payload.introText),
     outroText: normalizeOptionalText(payload.outroText),
@@ -1198,7 +1319,7 @@ function normalizeNewsletterSendPayload(
     searchPresetName: normalizeOptionalText(payload.searchPresetName),
     subscriptionTemplateId: normalizeOptionalText(payload.subscriptionTemplateId),
     subscriptionTemplateName: normalizeOptionalText(payload.subscriptionTemplateName),
-    recipients: payload.recipients.map((recipient) => normalizeEmail(recipient)),
+    recipients: normalizeRecipientList(payload.recipients),
   };
 }
 
@@ -1373,6 +1494,140 @@ function getScheduledJobStatusRank(status: ScheduledNewsletterJobRecord["status"
   if (status === "sent") return 4;
   if (status === "skipped") return 5;
   return 6;
+}
+
+function isDuplicateScheduledJob(
+  item: ScheduledNewsletterJobRecord,
+  payload: NewsletterSendPayload,
+  scheduledAt: string,
+  recurrence: ScheduledNewsletterRecurrence,
+): boolean {
+  if (!ACTIVE_DUPLICATE_SCHEDULE_STATUSES.has(item.status)) {
+    return false;
+  }
+
+  return buildScheduledJobFingerprint(item.payload, item.scheduledAt, item.recurrence)
+    === buildScheduledJobFingerprint(payload, scheduledAt, recurrence);
+}
+
+function findDuplicateScheduledJob(
+  items: readonly ScheduledNewsletterJobRecord[],
+  payload: NewsletterSendPayload,
+  scheduledAt: string,
+  recurrence: ScheduledNewsletterRecurrence,
+  excludeId?: string,
+): ScheduledNewsletterJobRecord | undefined {
+  return items.find((item) =>
+    item.id !== excludeId
+    && isDuplicateScheduledJob(item, payload, scheduledAt, recurrence)
+  );
+}
+
+function buildScheduledJobFingerprint(
+  payload: NewsletterSendPayload,
+  scheduledAt: string,
+  recurrence: ScheduledNewsletterRecurrence,
+): string {
+  const normalizedPayload = normalizeNewsletterSendPayload(payload);
+  const includeAllResults = normalizedPayload.includeAllResults === true;
+  const recipientGroupId = normalizeOptionalText(normalizedPayload.recipientGroupId);
+
+  return JSON.stringify({
+    scheduledAt,
+    recurrence,
+    includeAllResults,
+    query: normalizedPayload.query,
+    selectedBillIds: sortNormalizedValues(normalizedPayload.selectedBillIds),
+    itemBillIds: includeAllResults ? [] : sortNormalizedValues(extractPayloadItemBillIds(normalizedPayload.items)),
+    subject: normalizedPayload.subject,
+    introText: normalizedPayload.introText,
+    outroText: normalizedPayload.outroText,
+    onlyNewResults: normalizedPayload.onlyNewResults === true,
+    excludeBillIds: sortNormalizedValues(normalizedPayload.excludeBillIds),
+    recipientGroupId,
+    recipientGroupName: normalizeOptionalText(normalizedPayload.recipientGroupName),
+    recipients: recipientGroupId ? [] : normalizedPayload.recipients,
+    searchPresetId: normalizeOptionalText(normalizedPayload.searchPresetId),
+    searchPresetName: normalizeOptionalText(normalizedPayload.searchPresetName),
+    subscriptionTemplateId: normalizeOptionalText(normalizedPayload.subscriptionTemplateId),
+    subscriptionTemplateName: normalizeOptionalText(normalizedPayload.subscriptionTemplateName),
+  });
+}
+
+function extractPayloadItemBillIds(
+  items: readonly NewsletterSendPayload["items"][number][],
+): string[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return normalizeBillIdList(
+    items.map((item) => {
+      if (typeof item !== "object" || item === null) {
+        return "";
+      }
+
+      return typeof item.billId === "string" ? item.billId : "";
+    }),
+  );
+}
+
+function normalizeRecipientList(recipients: readonly string[] | null | undefined): string[] {
+  if (!Array.isArray(recipients)) {
+    return [];
+  }
+
+  return sortNormalizedValues(
+    recipients
+      .map((recipient) => normalizeEmail(recipient))
+      .filter(Boolean),
+  );
+}
+
+function sortNormalizedValues(values: readonly string[] | null | undefined): string[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return Array.from(new Set(values.filter(Boolean))).sort((left, right) =>
+    left.localeCompare(right)
+  );
+}
+
+function buildDuplicateScheduledJobErrorMessage(item: ScheduledNewsletterJobRecord): string {
+  return [
+    "같은 조건의 예약 발송이 이미 등록되어 있습니다.",
+    `기존 예약: ${formatScheduledAtKst(item.scheduledAt)} · ${getScheduledJobStatusLabel(item.status)}`,
+    "기존 예약을 수정·재개하거나 취소한 뒤 다시 시도해 주세요.",
+  ].join(" ");
+}
+
+function formatScheduledAtKst(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const formatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return formatter.format(date);
+}
+
+function getScheduledJobStatusLabel(status: ScheduledNewsletterJobRecord["status"]): string {
+  if (status === "pending") return "대기 중";
+  if (status === "processing") return "처리 중";
+  if (status === "paused") return "일시정지";
+  if (status === "failed") return "실패";
+  if (status === "sent") return "발송 완료";
+  if (status === "skipped") return "건너뜀";
+  return "취소";
 }
 
 function formatNowKst(): string {
