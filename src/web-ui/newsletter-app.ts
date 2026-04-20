@@ -1993,6 +1993,73 @@ export function buildNewsletterAppHtml(
       return parts.length ? " · " + parts.join(" · ") : "";
     }
 
+    function hasMeaningfulSearchQuery(query) {
+      return Boolean(
+        query
+        && (
+          query.keyword
+          || query.proposerFilter
+          || query.committeeFilter
+          || query.datePreset
+          || query.dateFrom
+          || query.dateTo
+          || query.noticeScope
+          || query.sortBy
+          || query.page
+          || query.pageSize
+        )
+      );
+    }
+
+    function buildSearchUrlParams(query) {
+      const params = new URLSearchParams();
+      if (query.keyword) params.set("keyword", query.keyword);
+      if (query.proposerFilter) params.set("proposer", query.proposerFilter);
+      if (query.committeeFilter) params.set("committee", query.committeeFilter);
+      if (query.datePreset) params.set("preset", query.datePreset);
+      if (query.dateFrom) params.set("from", query.dateFrom);
+      if (query.dateTo) params.set("to", query.dateTo);
+      if (query.noticeScope) params.set("scope", query.noticeScope);
+      if (query.sortBy) params.set("sort", query.sortBy);
+      if (query.page) params.set("page", String(query.page));
+      if (query.pageSize) params.set("pageSize", String(query.pageSize));
+      return params;
+    }
+
+    function replaceSearchUrl(query) {
+      const params = buildSearchUrlParams(query || {});
+      const nextUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
+      window.history.replaceState({}, "", nextUrl);
+    }
+
+    function applyInitialQueryFromUrl() {
+      if (!hasMeaningfulSearchQuery(initialQueryFromUrl)) {
+        return false;
+      }
+
+      keywordInput.value = initialQueryFromUrl.keyword || "";
+      proposerFilterInput.value = initialQueryFromUrl.proposerFilter || "";
+      committeeFilterInput.value = initialQueryFromUrl.committeeFilter || "";
+      noticeScopeSelect.value = initialQueryFromUrl.noticeScope || "include_closed";
+      sortBySelect.value = initialQueryFromUrl.sortBy || "relevance";
+      pageSizeSelect.value = String(initialQueryFromUrl.pageSize || DEFAULT_PAGE_SIZE);
+
+      if (initialQueryFromUrl.datePreset === "custom") {
+        applyPreset("custom");
+        dateFromInput.value = initialQueryFromUrl.dateFrom || "";
+        dateToInput.value = initialQueryFromUrl.dateTo || "";
+        state.query.dateFrom = initialQueryFromUrl.dateFrom || "";
+        state.query.dateTo = initialQueryFromUrl.dateTo || "";
+      } else {
+        applyPreset(initialQueryFromUrl.datePreset || "1m");
+      }
+
+      state.query.page = Number.isInteger(initialQueryFromUrl.page) && initialQueryFromUrl.page > 0
+        ? initialQueryFromUrl.page
+        : 1;
+      return true;
+    }
+
     function getDatePresetLabel(value) {
       if (value === "6m") return "최근 6개월";
       if (value === "3m") return "최근 3개월";
@@ -2017,9 +2084,7 @@ export function buildNewsletterAppHtml(
       return "낮음 (" + score.toFixed(2) + ")";
     }
 
-    function startNewSearch() {
-      syncQueryFromInputs();
-      state.query.page = 1;
+    function resetSearchState() {
       state.total = 0;
       state.totalPages = 1;
       state.items = [];
@@ -2030,6 +2095,14 @@ export function buildNewsletterAppHtml(
       renderResults();
       renderPagination();
       updateComposerStatus();
+    }
+
+    function startNewSearch(resetPage) {
+      syncQueryFromInputs();
+      if (resetPage !== false) {
+        state.query.page = 1;
+      }
+      resetSearchState();
       performSearch();
     }
 
