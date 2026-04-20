@@ -7,6 +7,8 @@ export function renderNewsletterMarkdown(
     `# ${document.subject}`,
     "",
     `- 키워드: ${document.keyword ?? "없음"}`,
+    ...(document.proposerFilter ? [`- 발의 의원 필터: ${document.proposerFilter}`] : []),
+    ...(document.committeeFilter ? [`- 상임위 필터: ${document.committeeFilter}`] : []),
     `- 기간: ${document.dateFrom} ~ ${document.dateTo}`,
     `- 생성시각: ${document.generatedAt} ${document.timeZone}`,
     `- 포함 법안 수: ${document.items.length}건`,

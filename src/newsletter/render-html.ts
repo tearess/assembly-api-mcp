@@ -3,6 +3,7 @@ import { type NewsletterDocument } from "./types.js";
 export function renderNewsletterHtml(
   document: NewsletterDocument,
 ): string {
+  const filterBoxes = renderFilterMetaBoxes(document);
   const introBlock = document.introText
     ? `<section class="copy-block"><h2>브리핑 메모</h2><p>${escapeHtml(document.introText)}</p></section>`
     : "";
@@ -85,6 +86,7 @@ export function renderNewsletterHtml(
         <div class="meta-box"><dt>조회 기간</dt><dd>${escapeHtml(`${document.dateFrom} ~ ${document.dateTo}`)}</dd></div>
         <div class="meta-box"><dt>생성 시각</dt><dd>${escapeHtml(`${document.generatedAt} ${document.timeZone}`)}</dd></div>
         <div class="meta-box"><dt>포함 법안</dt><dd>${escapeHtml(String(document.items.length))}건</dd></div>
+        ${filterBoxes}
       </dl>
     </header>
     ${introBlock}
@@ -94,6 +96,17 @@ export function renderNewsletterHtml(
   </div>
 </body>
 </html>`;
+}
+
+function renderFilterMetaBoxes(document: NewsletterDocument): string {
+  const boxes: string[] = [];
+  if (document.proposerFilter) {
+    boxes.push(`<div class="meta-box"><dt>발의 의원 필터</dt><dd>${escapeHtml(document.proposerFilter)}</dd></div>`);
+  }
+  if (document.committeeFilter) {
+    boxes.push(`<div class="meta-box"><dt>상임위 필터</dt><dd>${escapeHtml(document.committeeFilter)}</dd></div>`);
+  }
+  return boxes.join("");
 }
 
 function escapeHtml(value: string): string {

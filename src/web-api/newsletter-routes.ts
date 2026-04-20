@@ -37,6 +37,7 @@ import {
   renderNewsletterMarkdown,
 } from "../newsletter/render-markdown.js";
 import { renderNewsletterHtml } from "../newsletter/render-html.js";
+import { parseLegislationSearchQueryFromParams } from "../newsletter/query-url.js";
 import {
   type LegislationSearchQuery,
   type LegislationSortBy,
@@ -56,7 +57,11 @@ export async function handleNewsletterRequest(
   const pathname = requestUrl.pathname;
 
   if (req.method === "GET" && pathname === "/newsletter") {
-    sendHtml(res, 200, buildNewsletterAppHtml());
+    sendHtml(
+      res,
+      200,
+      buildNewsletterAppHtml(parseLegislationSearchQueryFromParams(requestUrl.searchParams)),
+    );
     return true;
   }
 
@@ -742,6 +747,8 @@ function toSearchQuery(input: unknown): LegislationSearchQuery {
 
   return {
     keyword: nullableString(input.keyword) ?? undefined,
+    proposerFilter: nullableString(input.proposerFilter) ?? undefined,
+    committeeFilter: nullableString(input.committeeFilter) ?? undefined,
     datePreset: isDatePreset(input.datePreset) ? input.datePreset : undefined,
     dateFrom: nullableString(input.dateFrom) ?? undefined,
     dateTo: nullableString(input.dateTo) ?? undefined,
@@ -760,6 +767,8 @@ function toSavedSearchPresetQuery(input: unknown): SavedSearchPresetQuery {
 
   return {
     keyword: query.keyword?.trim() || null,
+    proposerFilter: query.proposerFilter?.trim() || null,
+    committeeFilter: query.committeeFilter?.trim() || null,
     datePreset: isCustom ? "custom" : query.datePreset ?? "1m",
     dateFrom: isCustom ? query.dateFrom?.trim() || null : null,
     dateTo: isCustom ? query.dateTo?.trim() || null : null,

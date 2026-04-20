@@ -37,11 +37,35 @@ export interface ApiResult {
   readonly rows: readonly Record<string, unknown>[];
 }
 
+export interface ApiClientOptions {
+  /** BILL_ID 기반 상세 조회도 TTL 캐시에 포함할지 여부 */
+  readonly cacheByBillId?: boolean;
+}
+
+export interface ApiClient {
+  fetchOpenAssembly(
+    apiCode: string,
+    params?: Record<string, string | number>,
+  ): Promise<ApiResult>;
+  fetchDataGoKr(
+    servicePath: string,
+    params?: Record<string, string | number>,
+  ): Promise<unknown>;
+  readonly cache: Cache;
+  readonly monitor: Monitor;
+  readonly rateLimiter: RateLimiter;
+}
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
 
-export function createApiClient(config: AppConfig) {
+const sharedClients = new WeakMap<AppConfig, Map<string, ApiClient>>();
+
+export function createApiClient(
+  config: AppConfig,
+  options: ApiClientOptions = {},
+): ApiClient {
   const { assemblyApiKey } = config.apiKeys;
   const cache: Cache = createCache(config.cache);
   const monitor: Monitor = createMonitor();
@@ -59,7 +83,7 @@ export function createApiClient(config: AppConfig) {
   }
 
   function shouldCache(params: Record<string, string | number>): boolean {
-    return !("BILL_ID" in params);
+    return options.cacheByBillId === true || !("BILL_ID" in params);
   }
 
   /**
@@ -163,9 +187,34 @@ export function createApiClient(config: AppConfig) {
   return { fetchOpenAssembly, fetchDataGoKr, cache, monitor, rateLimiter };
 }
 
+export function getSharedApiClient(
+  config: AppConfig,
+  options: ApiClientOptions = {},
+): ApiClient {
+  const optionKey = buildClientOptionKey(options);
+  let clientMap = sharedClients.get(config);
+  if (!clientMap) {
+    clientMap = new Map<string, ApiClient>();
+    sharedClients.set(config, clientMap);
+  }
+
+  const existing = clientMap.get(optionKey);
+  if (existing) {
+    return existing;
+  }
+
+  const client = createApiClient(config, options);
+  clientMap.set(optionKey, client);
+  return client;
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+function buildClientOptionKey(options: ApiClientOptions): string {
+  return `cacheByBillId:${options.cacheByBillId === true ? "1" : "0"}`;
+}
 
 async function fetchWithErrorHandling(url: string): Promise<unknown> {
   let response: Response;

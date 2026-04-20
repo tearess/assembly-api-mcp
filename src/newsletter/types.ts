@@ -4,6 +4,8 @@ export type LegislationSortBy = "relevance" | "notice_end_desc" | "notice_end_as
 
 export interface LegislationSearchQuery {
   readonly keyword?: string;
+  readonly proposerFilter?: string;
+  readonly committeeFilter?: string;
   readonly datePreset?: DatePreset;
   readonly dateFrom?: string;
   readonly dateTo?: string;
@@ -40,6 +42,8 @@ export interface LegislationItem {
 
 export interface LegislationSearchResultQuery {
   readonly keyword: string | null;
+  readonly proposerFilter: string | null;
+  readonly committeeFilter: string | null;
   readonly datePreset: DatePreset;
   readonly dateFrom: string;
   readonly dateTo: string;
@@ -60,6 +64,8 @@ export interface LegislationSearchResult {
 export interface NewsletterDocument {
   readonly subject: string;
   readonly keyword: string | null;
+  readonly proposerFilter?: string | null;
+  readonly committeeFilter?: string | null;
   readonly dateFrom: string;
   readonly dateTo: string;
   readonly timeZone: string;
@@ -128,6 +134,8 @@ export interface SentNewsletterSnapshotRecord {
 
 export interface SavedSearchPresetQuery {
   readonly keyword: string | null;
+  readonly proposerFilter: string | null;
+  readonly committeeFilter: string | null;
   readonly datePreset: DatePreset;
   readonly dateFrom: string | null;
   readonly dateTo: string | null;

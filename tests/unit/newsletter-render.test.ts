@@ -11,6 +11,8 @@ function createDocument(): NewsletterDocument {
   return {
     subject: "[입법예고 뉴스레터] 인공지능 관련 법안 브리핑",
     keyword: "인공지능",
+    proposerFilter: "홍길동",
+    committeeFilter: "과학기술정보방송통신위원회",
     dateFrom: "2026-03-20",
     dateTo: "2026-04-20",
     timeZone: "Asia/Seoul",
@@ -42,6 +44,8 @@ describe("newsletter/render", () => {
     const markdown = renderNewsletterMarkdown(createDocument());
 
     expect(markdown).toContain("# [입법예고 뉴스레터] 인공지능 관련 법안 브리핑");
+    expect(markdown).toContain("발의 의원 필터: 홍길동");
+    expect(markdown).toContain("상임위 필터: 과학기술정보방송통신위원회");
     expect(markdown).toContain("## 브리핑 메모");
     expect(markdown).toContain("이번 브리핑은 인공지능 산업 진흥과 안전성 기준 정비에 초점을 맞췄습니다.");
     expect(markdown).toContain("## 1. 인공지능 산업 진흥법 일부개정법률안");
@@ -59,6 +63,8 @@ describe("newsletter/render", () => {
     const html = renderNewsletterHtml(createDocument());
 
     expect(html).toContain("<!DOCTYPE html>");
+    expect(html).toContain("발의 의원 필터");
+    expect(html).toContain("상임위 필터");
     expect(html).toContain("브리핑 메모");
     expect(html).toContain("이번 브리핑은 인공지능 산업 진흥과 안전성 기준 정비에 초점을 맞췄습니다.");
     expect(html).toContain("인공지능 산업 진흥법 일부개정법률안");

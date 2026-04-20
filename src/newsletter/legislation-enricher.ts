@@ -1,4 +1,4 @@
-import { type ApiResult, createApiClient } from "../api/client.js";
+import { type ApiResult, getSharedApiClient } from "../api/client.js";
 import { API_CODES, CURRENT_AGE } from "../api/codes.js";
 import { type AppConfig } from "../config.js";
 import { LegislationStageService } from "./legislation-stage.js";
@@ -14,7 +14,9 @@ interface AssemblyApiLike {
 export function createLegislationEnrichmentService(
   config: AppConfig,
 ): LegislationEnrichmentService {
-  return new LegislationEnrichmentService(createApiClient(config));
+  return new LegislationEnrichmentService(
+    getSharedApiClient(config, { cacheByBillId: true }),
+  );
 }
 
 export class LegislationEnrichmentService {

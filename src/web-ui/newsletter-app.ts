@@ -1,4 +1,9 @@
-export function buildNewsletterAppHtml(): string {
+import { type LegislationSearchQuery } from "../newsletter/types.js";
+
+export function buildNewsletterAppHtml(
+  initialQuery: LegislationSearchQuery = {},
+): string {
+  const initialQueryScript = serializeInlineScriptValue(initialQuery);
   return String.raw`<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -207,6 +212,11 @@ export function buildNewsletterAppHtml(): string {
       grid-template-columns: repeat(3, minmax(160px, 220px));
       gap: 12px;
       margin-top: 14px;
+    }
+
+    .search-actions {
+      margin-top: 14px;
+      justify-content: flex-start;
     }
 
     .saved-preset-row {
@@ -532,6 +542,9 @@ export function buildNewsletterAppHtml(): string {
       font-size: 0.75rem;
       font-weight: 700;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
     }
 
     .mini-action-btn:hover {
@@ -921,6 +934,20 @@ export function buildNewsletterAppHtml(): string {
               </select>
             </label>
           </div>
+          <div class="filter-row">
+            <label>
+              발의 의원 필터
+              <input id="proposerFilterInput" type="text" placeholder="예: 홍길동, 김의원">
+            </label>
+            <label>
+              상임위 필터
+              <input id="committeeFilterInput" type="text" placeholder="예: 과학기술정보방송통신위원회">
+            </label>
+          </div>
+          <div class="actions-row search-actions">
+            <button id="copySearchLinkBtn" class="ghost-btn" type="button">검색 링크 복사</button>
+            <button id="resetSearchBtn" class="ghost-btn" type="button">초기화</button>
+          </div>
           <div class="saved-preset-row">
             <label>
               검색 preset 이름
@@ -1216,10 +1243,13 @@ export function buildNewsletterAppHtml(): string {
 
   <script>
     const DEFAULT_PAGE_SIZE = 20;
+    const initialQueryFromUrl = ${initialQueryScript};
 
     const state = {
       query: {
         keyword: "",
+        proposerFilter: "",
+        committeeFilter: "",
         datePreset: "1m",
         dateFrom: "",
         dateTo: "",
@@ -1255,8 +1285,12 @@ export function buildNewsletterAppHtml(): string {
     };
 
     const keywordInput = document.getElementById("keywordInput");
+    const proposerFilterInput = document.getElementById("proposerFilterInput");
+    const committeeFilterInput = document.getElementById("committeeFilterInput");
     const dateFromInput = document.getElementById("dateFromInput");
     const dateToInput = document.getElementById("dateToInput");
+    const copySearchLinkBtn = document.getElementById("copySearchLinkBtn");
+    const resetSearchBtn = document.getElementById("resetSearchBtn");
     const noticeScopeSelect = document.getElementById("noticeScopeSelect");
     const sortBySelect = document.getElementById("sortBySelect");
     const pageSizeSelect = document.getElementById("pageSizeSelect");
@@ -1329,6 +1363,7 @@ export function buildNewsletterAppHtml(): string {
     noticeScopeSelect.value = state.query.noticeScope;
     sortBySelect.value = state.query.sortBy;
     pageSizeSelect.value = String(state.query.pageSize);
+    const shouldAutoSearchFromUrl = applyInitialQueryFromUrl();
     scheduleAtInput.value = getDefaultScheduleAtValue();
     scheduleRecurrenceSelect.value = "once";
     subscriptionFilterInput.value = "";
@@ -1357,6 +1392,9 @@ export function buildNewsletterAppHtml(): string {
     void loadScheduleRuns();
     void loadRecipients();
     void loadSendLogs();
+    if (shouldAutoSearchFromUrl) {
+      startNewSearch(false);
+    }
     window.setInterval(() => {
       void loadSubscriptionActivities();
       void loadOperationalSummary();
@@ -1373,6 +1411,14 @@ export function buildNewsletterAppHtml(): string {
 
     document.getElementById("searchBtn").addEventListener("click", () => {
       startNewSearch();
+    });
+
+    copySearchLinkBtn.addEventListener("click", async () => {
+      await copySearchLink();
+    });
+
+    resetSearchBtn.addEventListener("click", () => {
+      resetSearchForm();
     });
 
     document.getElementById("savePresetBtn").addEventListener("click", async () => {
@@ -1396,6 +1442,20 @@ export function buildNewsletterAppHtml(): string {
     });
 
     keywordInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        startNewSearch();
+      }
+    });
+
+    proposerFilterInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        startNewSearch();
+      }
+    });
+
+    committeeFilterInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
         startNewSearch();
@@ -1757,6 +1817,7 @@ export function buildNewsletterAppHtml(): string {
 
     function getSubscriptionSummary(subscription) {
       const keyword = subscription.query.keyword ? '키워드 ' + subscription.query.keyword : '키워드 없음';
+      const filters = getAdditionalSearchFilterSummary(subscription.query);
       const dateRange = subscription.query.datePreset === "custom"
         ? ((subscription.query.dateFrom || "미정") + " ~ " + (subscription.query.dateTo || "미정"))
         : getDatePresetLabel(subscription.query.datePreset);
@@ -1769,7 +1830,7 @@ export function buildNewsletterAppHtml(): string {
       const recurrence = getScheduleRecurrenceLabel(subscription.recurrence || "once");
       const newOnly = subscription.onlyNewResults ? " · 새 법안만" : "";
       const activity = getSubscriptionActivitySummary(subscription);
-      return keyword + " · " + dateRange + " · " + linkedPreset + " · " + recipientSource + " · 수신자 " +
+      return keyword + filters + " · " + dateRange + " · " + linkedPreset + " · " + recipientSource + " · 수신자 " +
         String((subscription.recipients || []).length) + "명 · " + recurrence + newOnly + activity;
     }
 
@@ -1874,6 +1935,8 @@ export function buildNewsletterAppHtml(): string {
       const statusMessage = options && options.statusMessage ? options.statusMessage : "";
 
       keywordInput.value = query.keyword || "";
+      proposerFilterInput.value = query.proposerFilter || "";
+      committeeFilterInput.value = query.committeeFilter || "";
       noticeScopeSelect.value = query.noticeScope || "include_closed";
       sortBySelect.value = query.sortBy || "relevance";
       pageSizeSelect.value = String(query.pageSize || DEFAULT_PAGE_SIZE);
@@ -1911,11 +1974,23 @@ export function buildNewsletterAppHtml(): string {
       const scope = getNoticeScopeLabel(preset.query.noticeScope);
       const sortBy = getSortByLabel(preset.query.sortBy);
       const keyword = preset.query.keyword ? '키워드 ' + preset.query.keyword : '키워드 없음';
+      const filters = getAdditionalSearchFilterSummary(preset.query);
       const dateRange = preset.query.datePreset === "custom"
         ? ((preset.query.dateFrom || "미정") + " ~ " + (preset.query.dateTo || "미정"))
         : getDatePresetLabel(preset.query.datePreset);
 
-      return keyword + " · " + dateRange + " · " + scope + " · " + sortBy + " · " + preset.query.pageSize + "건";
+      return keyword + filters + " · " + dateRange + " · " + scope + " · " + sortBy + " · " + preset.query.pageSize + "건";
+    }
+
+    function getAdditionalSearchFilterSummary(query) {
+      const parts = [];
+      if (query && query.proposerFilter) {
+        parts.push("발의 의원 " + query.proposerFilter);
+      }
+      if (query && query.committeeFilter) {
+        parts.push("상임위 " + query.committeeFilter);
+      }
+      return parts.length ? " · " + parts.join(" · ") : "";
     }
 
     function getDatePresetLabel(value) {
@@ -1960,6 +2035,8 @@ export function buildNewsletterAppHtml(): string {
 
     function syncQueryFromInputs() {
       state.query.keyword = keywordInput.value.trim();
+      state.query.proposerFilter = proposerFilterInput.value.trim();
+      state.query.committeeFilter = committeeFilterInput.value.trim();
       state.query.dateFrom = dateFromInput.value || "";
       state.query.dateTo = dateToInput.value || "";
       state.query.noticeScope = noticeScopeSelect.value;
@@ -1976,6 +2053,8 @@ export function buildNewsletterAppHtml(): string {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             keyword: state.query.keyword,
+            proposerFilter: state.query.proposerFilter || undefined,
+            committeeFilter: state.query.committeeFilter || undefined,
             datePreset: state.query.datePreset,
             dateFrom: state.query.dateFrom || undefined,
             dateTo: state.query.dateTo || undefined,
@@ -2007,9 +2086,10 @@ export function buildNewsletterAppHtml(): string {
           "총 " + data.total + "건 · 기간 " + data.query.dateFrom + " ~ " + data.query.dateTo +
           " · 페이지 " + data.query.page + "/" + data.totalPages +
           " · 범위 " + getNoticeScopeLabel(data.query.noticeScope) +
-          " · 정렬 " + getSortByLabel(data.query.sortBy);
+          " · 정렬 " + getSortByLabel(data.query.sortBy) +
+          getAdditionalSearchFilterSummary(data.query);
         if (!subjectInput.value.trim()) {
-          const subjectKeyword = data.query.keyword || "입법예고";
+          const subjectKeyword = data.query.keyword || data.query.committeeFilter || data.query.proposerFilter || "입법예고";
           subjectInput.value = "[입법예고 뉴스레터] " + subjectKeyword + " 관련 법안 브리핑";
         }
 
@@ -3388,6 +3468,8 @@ export function buildNewsletterAppHtml(): string {
     function buildQuerySourceFromState() {
       return {
         keyword: state.query.keyword || null,
+        proposerFilter: state.query.proposerFilter || null,
+        committeeFilter: state.query.committeeFilter || null,
         datePreset: state.query.datePreset,
         dateFrom: state.query.dateFrom || null,
         dateTo: state.query.dateTo || null,
@@ -3444,6 +3526,8 @@ export function buildNewsletterAppHtml(): string {
       return {
         query: {
           keyword: querySource.keyword || undefined,
+          proposerFilter: querySource.proposerFilter || undefined,
+          committeeFilter: querySource.committeeFilter || undefined,
           datePreset: querySource.datePreset,
           dateFrom: querySource.dateFrom || undefined,
           dateTo: querySource.dateTo || undefined,
@@ -3487,6 +3571,8 @@ export function buildNewsletterAppHtml(): string {
       const isCustom = state.query.datePreset === "custom";
       return {
         keyword: state.query.keyword || null,
+        proposerFilter: state.query.proposerFilter || null,
+        committeeFilter: state.query.committeeFilter || null,
         datePreset: state.query.datePreset,
         dateFrom: isCustom ? (state.query.dateFrom || null) : null,
         dateTo: isCustom ? (state.query.dateTo || null) : null,
@@ -3626,6 +3712,8 @@ export function buildNewsletterAppHtml(): string {
     function buildSearchQueryFromPreset(preset) {
       return {
         keyword: preset.query.keyword || null,
+        proposerFilter: preset.query.proposerFilter || null,
+        committeeFilter: preset.query.committeeFilter || null,
         datePreset: preset.query.datePreset,
         dateFrom: preset.query.dateFrom || null,
         dateTo: preset.query.dateTo || null,
@@ -3648,6 +3736,8 @@ export function buildNewsletterAppHtml(): string {
         linkedPreset,
         querySource: linkedPreset ? buildSearchQueryFromPreset(linkedPreset) : {
           keyword: subscription.query.keyword || null,
+          proposerFilter: subscription.query.proposerFilter || null,
+          committeeFilter: subscription.query.committeeFilter || null,
           datePreset: subscription.query.datePreset,
           dateFrom: subscription.query.dateFrom || null,
           dateTo: subscription.query.dateTo || null,
@@ -4136,4 +4226,11 @@ export function buildNewsletterAppHtml(): string {
   </script>
 </body>
 </html>`;
+}
+
+function serializeInlineScriptValue(value: unknown): string {
+  return JSON.stringify(value ?? {})
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026");
 }

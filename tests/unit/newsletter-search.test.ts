@@ -129,6 +129,8 @@ describe("newsletter/legislation-search", () => {
 
     expect(result.total).toBe(2);
     expect(result.totalPages).toBe(1);
+    expect(result.query.proposerFilter).toBeNull();
+    expect(result.query.committeeFilter).toBeNull();
     expect(result.items[0]).toMatchObject({
       billId: "BILL_001",
       billNo: "2200001",
@@ -147,6 +149,55 @@ describe("newsletter/legislation-search", () => {
       stageLabel: "입법예고 종료",
       noticeEndDate: "2026-04-05",
     });
+  });
+
+  it("발의 의원과 상임위 추가 필터를 함께 적용한다", async () => {
+    const fetchOpenAssembly = vi.fn().mockResolvedValue({
+      totalCount: 3,
+      rows: [
+        {
+          BILL_ID: "BILL_201",
+          BILL_NO: "2200201",
+          BILL_NAME: "인공지능 기본법안",
+          PROPOSER: "홍길동",
+          CURR_COMMITTEE: "과학기술정보방송통신위원회",
+          NOTI_ED_DT: "2026-04-18",
+        },
+        {
+          BILL_ID: "BILL_202",
+          BILL_NO: "2200202",
+          BILL_NAME: "인공지능 데이터법안",
+          PROPOSER: "홍길동",
+          CURR_COMMITTEE: "정무위원회",
+          NOTI_ED_DT: "2026-04-17",
+        },
+        {
+          BILL_ID: "BILL_203",
+          BILL_NO: "2200203",
+          BILL_NAME: "인공지능 안전법안",
+          PROPOSER: "김철수",
+          CURR_COMMITTEE: "과학기술정보방송통신위원회",
+          NOTI_ED_DT: "2026-04-16",
+        },
+      ],
+    });
+
+    const service = new LegislationSearchService({ fetchOpenAssembly }, 100);
+    const result = await service.search(
+      {
+        keyword: "인공지능",
+        proposerFilter: "홍길동",
+        committeeFilter: "과학기술정보",
+        noticeScope: "active_only",
+        page: 1,
+        pageSize: 20,
+      },
+      new Date("2026-04-20T08:00:00Z"),
+    );
+
+    expect(result.query.proposerFilter).toBe("홍길동");
+    expect(result.query.committeeFilter).toBe("과학기술정보");
+    expect(result.items.map((item) => item.billId)).toEqual(["BILL_201"]);
   });
 
   it("active_only면 진행중 입법예고만 조회한다", async () => {

@@ -1,4 +1,4 @@
-import { type ApiResult, createApiClient } from "../api/client.js";
+import { type ApiResult, getSharedApiClient } from "../api/client.js";
 import { API_CODES } from "../api/codes.js";
 import { type AppConfig } from "../config.js";
 import { type LegislationItem } from "./types.js";
@@ -26,7 +26,9 @@ export interface InferBillStageInput {
 export function createLegislationStageService(
   config: AppConfig,
 ): LegislationStageService {
-  return new LegislationStageService(createApiClient(config));
+  return new LegislationStageService(
+    getSharedApiClient(config, { cacheByBillId: true }),
+  );
 }
 
 export class LegislationStageService {

@@ -122,12 +122,19 @@ export async function buildNewsletterDocumentFromPayload(
   }
 
   const keyword = resolvedPayload.query.keyword?.trim() || null;
+  const proposerFilter = resolvedPayload.query.proposerFilter?.trim() || null;
+  const committeeFilter = resolvedPayload.query.committeeFilter?.trim() || null;
   const dateFrom = resolvedPayload.query.dateFrom ?? inferDateFromItems(items);
   const dateTo = resolvedPayload.query.dateTo ?? inferDateToItems(items);
 
   return {
-    subject: normalizeSubject(resolvedPayload.subject, keyword),
+    subject: normalizeSubject(
+      resolvedPayload.subject,
+      buildSubjectContext(keyword, proposerFilter, committeeFilter),
+    ),
     keyword,
+    proposerFilter,
+    committeeFilter,
     dateFrom,
     dateTo,
     timeZone: "Asia/Seoul",
@@ -339,6 +346,8 @@ function toSearchQuery(input: unknown): LegislationSearchQuery {
 
   return {
     keyword: nullableString(input.keyword) ?? undefined,
+    proposerFilter: nullableString(input.proposerFilter) ?? undefined,
+    committeeFilter: nullableString(input.committeeFilter) ?? undefined,
     datePreset: isDatePreset(input.datePreset) ? input.datePreset : undefined,
     dateFrom: nullableString(input.dateFrom) ?? undefined,
     dateTo: nullableString(input.dateTo) ?? undefined,
@@ -351,12 +360,20 @@ function toSearchQuery(input: unknown): LegislationSearchQuery {
 
 function normalizeSubject(
   value: string | null,
-  keyword: string | null,
+  contextLabel: string | null,
 ): string {
   if (typeof value === "string" && value.trim() !== "") {
     return value.trim();
   }
-  return `[입법예고 뉴스레터] ${(keyword ?? "주요")} 관련 법안 브리핑`;
+  return `[입법예고 뉴스레터] ${(contextLabel ?? "주요")} 관련 법안 브리핑`;
+}
+
+function buildSubjectContext(
+  keyword: string | null,
+  proposerFilter: string | null,
+  committeeFilter: string | null,
+): string | null {
+  return keyword || committeeFilter || proposerFilter || null;
 }
 
 function mergeQueryWithSavedPreset(
@@ -366,6 +383,8 @@ function mergeQueryWithSavedPreset(
   return {
     ...query,
     keyword: presetQuery.keyword ?? undefined,
+    proposerFilter: presetQuery.proposerFilter ?? undefined,
+    committeeFilter: presetQuery.committeeFilter ?? undefined,
     datePreset: presetQuery.datePreset,
     dateFrom: presetQuery.dateFrom ?? undefined,
     dateTo: presetQuery.dateTo ?? undefined,

@@ -1,19 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createApiClient } from "../../src/api/client.js";
+import { createApiClient, getSharedApiClient } from "../../src/api/client.js";
 import { type AppConfig } from "../../src/config.js";
 
-function createTestConfig(overrides: Partial<AppConfig["apiKeys"]> = {}): AppConfig {
-  return {
+function createTestConfig(
+  apiKeyOverrides: Partial<AppConfig["apiKeys"]> = {},
+  overrides: Partial<AppConfig> = {},
+): AppConfig {
+  const base: AppConfig = {
     apiKeys: {
       assemblyApiKey: "test-assembly-key",
       dataGoKrServiceKey: "test-data-go-kr-key",
       nanetApiKey: undefined,
       naboApiKey: undefined,
-      ...overrides,
     },
     server: { transport: "stdio", port: 3000, logLevel: "info" },
     cache: { enabled: false, ttlStatic: 86400, ttlDynamic: 3600 },
     apiResponse: { defaultType: "json", defaultPageSize: 20, maxPageSize: 100 },
+    profile: "lite",
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    apiKeys: {
+      ...base.apiKeys,
+      ...apiKeyOverrides,
+      ...overrides.apiKeys,
+    },
   };
 }
 
@@ -127,6 +140,74 @@ describe("createApiClient", () => {
       const result = await client.fetchOpenAssembly("EMPTY_API");
       expect(result.totalCount).toBe(0);
       expect(result.rows).toHaveLength(0);
+    });
+
+    it("cacheByBillId 옵션이 있으면 BILL_ID 상세 조회도 캐시한다", async () => {
+      const mockResponse = {
+        TEST_API: [
+          {
+            head: [
+              { list_total_count: 1 },
+              { RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다." } },
+            ],
+          },
+          {
+            row: [{ BILL_ID: "BILL_001", BILL_NAME: "테스트 법안" }],
+          },
+        ],
+      };
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify(mockResponse), { status: 200 }),
+      );
+
+      const client = createApiClient(
+        createTestConfig({}, {
+          cache: { enabled: true, ttlStatic: 86400, ttlDynamic: 3600 },
+        }),
+        { cacheByBillId: true },
+      );
+
+      await client.fetchOpenAssembly("TEST_API", { BILL_ID: "BILL_001" });
+      await client.fetchOpenAssembly("TEST_API", { BILL_ID: "BILL_001" });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("getSharedApiClient", () => {
+    it("같은 설정과 옵션이면 공유 client와 캐시를 재사용한다", async () => {
+      const mockResponse = {
+        TEST_API: [
+          {
+            head: [
+              { list_total_count: 1 },
+              { RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다." } },
+            ],
+          },
+          {
+            row: [{ BILL_NAME: "공유 캐시 테스트 법안" }],
+          },
+        ],
+      };
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify(mockResponse), { status: 200 }),
+      );
+
+      const config = createTestConfig({}, {
+        cache: { enabled: true, ttlStatic: 86400, ttlDynamic: 3600 },
+      });
+
+      const first = getSharedApiClient(config, { cacheByBillId: true });
+      const second = getSharedApiClient(config, { cacheByBillId: true });
+
+      expect(second).toBe(first);
+
+      await first.fetchOpenAssembly("TEST_API", { BILL_NAME: "공유 캐시" });
+      await second.fetchOpenAssembly("TEST_API", { BILL_NAME: "공유 캐시" });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
   });
 

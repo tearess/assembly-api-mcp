@@ -1,4 +1,4 @@
-import { type ApiResult, createApiClient } from "../api/client.js";
+import { type ApiResult, getSharedApiClient } from "../api/client.js";
 import { API_CODES, CURRENT_AGE } from "../api/codes.js";
 import { type AppConfig } from "../config.js";
 import {
@@ -31,7 +31,9 @@ export interface LegislationDetailResult {
 export function createLegislationDetailService(
   config: AppConfig,
 ): LegislationDetailService {
-  return new LegislationDetailService(createApiClient(config));
+  return new LegislationDetailService(
+    getSharedApiClient(config, { cacheByBillId: true }),
+  );
 }
 
 export class LegislationDetailService {

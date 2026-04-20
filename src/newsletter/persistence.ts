@@ -1096,6 +1096,8 @@ function normalizeSavedSearchPresetQuery(
 
   return {
     keyword: normalizeOptionalText(query.keyword),
+    proposerFilter: normalizeOptionalText(query.proposerFilter),
+    committeeFilter: normalizeOptionalText(query.committeeFilter),
     datePreset,
     dateFrom: datePreset === "custom" ? dateFrom : null,
     dateTo: datePreset === "custom" ? dateTo : null,
@@ -1290,6 +1292,8 @@ function normalizeScheduledJobQuery(
 
   return {
     keyword: normalizeOptionalText(source.keyword) ?? undefined,
+    proposerFilter: normalizeOptionalText(source.proposerFilter) ?? undefined,
+    committeeFilter: normalizeOptionalText(source.committeeFilter) ?? undefined,
     datePreset,
     dateFrom: datePreset === "custom" ? normalizeOptionalDate(source.dateFrom) ?? undefined : undefined,
     dateTo: datePreset === "custom" ? normalizeOptionalDate(source.dateTo) ?? undefined : undefined,

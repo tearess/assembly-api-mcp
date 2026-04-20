@@ -1,4 +1,4 @@
-import { type ApiResult, createApiClient } from "../api/client.js";
+import { type ApiResult, getSharedApiClient } from "../api/client.js";
 import { API_CODES, CURRENT_AGE } from "../api/codes.js";
 import { type AppConfig } from "../config.js";
 import { resolveDateRange } from "./date-range.js";
@@ -22,7 +22,7 @@ export function createLegislationSearchService(
   config: AppConfig,
 ): LegislationSearchService {
   return new LegislationSearchService(
-    createApiClient(config),
+    getSharedApiClient(config, { cacheByBillId: true }),
     config.apiResponse.maxPageSize,
   );
 }
@@ -42,6 +42,8 @@ export class LegislationSearchService {
     const pageSize = clampPageSize(query.pageSize, this.maxPageSize);
     const dateRange = resolveDateRange(query, now, timeZone);
     const keyword = normalizeText(query.keyword);
+    const proposerFilter = normalizeText(query.proposerFilter);
+    const committeeFilter = normalizeText(query.committeeFilter);
     const noticeScope = resolveNoticeScope(query.noticeScope);
     const sortBy = resolveSortBy(query.sortBy, keyword);
     const requestedWindowSize = Math.min(page * pageSize, this.maxPageSize);
@@ -69,6 +71,8 @@ export class LegislationSearchService {
         ...closedResult.rows.map((row) => mapLegislationItem(row, keyword, "closed")),
       ],
       keyword,
+      proposerFilter,
+      committeeFilter,
       dateRange,
       noticeScope,
       sortBy,
@@ -81,6 +85,8 @@ export class LegislationSearchService {
     return {
       query: {
         keyword,
+        proposerFilter,
+        committeeFilter,
         datePreset: dateRange.datePreset,
         dateFrom: dateRange.dateFrom,
         dateTo: dateRange.dateTo,
@@ -168,6 +174,8 @@ function mapLegislationItem(
 function mergeLegislationItems(
   items: readonly LegislationItem[],
   keyword: string | null,
+  proposerFilter: string | null,
+  committeeFilter: string | null,
   dateRange: ResolvedDateRange,
   noticeScope: NoticeScope,
   sortBy: LegislationSortBy,
@@ -177,6 +185,8 @@ function mergeLegislationItems(
   for (const item of items) {
     if (noticeScope === "active_only" && item.noticeStatus !== "active") continue;
     if (!matchesKeyword(item, keyword)) continue;
+    if (!matchesTextFilter(item.proposer, proposerFilter)) continue;
+    if (!matchesTextFilter(item.committee, committeeFilter)) continue;
     if (!matchesDateRange(item, dateRange)) continue;
 
     const dedupeKey = item.billId || item.billNo || item.billName;
@@ -234,6 +244,14 @@ function matchesKeyword(
   return item.billName.toLowerCase().includes(query)
     || item.proposer.toLowerCase().includes(query)
     || item.committee.toLowerCase().includes(query);
+}
+
+function matchesTextFilter(
+  value: string,
+  filterValue: string | null,
+): boolean {
+  if (!filterValue) return true;
+  return value.toLowerCase().includes(filterValue.toLowerCase());
 }
 
 function matchesDateRange(
