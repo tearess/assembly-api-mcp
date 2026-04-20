@@ -83,6 +83,8 @@ export interface NewsletterContentPayload {
   readonly recipientGroupName?: string | null;
   readonly searchPresetId?: string | null;
   readonly searchPresetName?: string | null;
+  readonly subscriptionTemplateId?: string | null;
+  readonly subscriptionTemplateName?: string | null;
 }
 
 export interface NewsletterSendPayload extends NewsletterContentPayload {
@@ -167,6 +169,41 @@ export interface ScheduledNewsletterRunRecord {
   readonly failedCount: number;
   readonly deliveryJobId: string | null;
   readonly runAt: string;
+}
+
+export interface NewsletterOperationalSummary {
+  readonly asOf: string;
+  readonly recipientCount: number;
+  readonly recipientGroupCount: number;
+  readonly searchPresetCount: number;
+  readonly subscriptionTemplateCount: number;
+  readonly scheduleCounts: {
+    readonly total: number;
+    readonly active: number;
+    readonly paused: number;
+    readonly failed: number;
+  };
+  readonly scheduleRunWindowDays: number;
+  readonly scheduleRunCounts: {
+    readonly sent: number;
+    readonly skipped: number;
+    readonly failed: number;
+  };
+  readonly sendLogCounts: {
+    readonly sent: number;
+    readonly failed: number;
+  };
+}
+
+export interface NewsletterSubscriptionActivityRecord {
+  readonly subscriptionId: string;
+  readonly scheduleCount: number;
+  readonly activeScheduleCount: number;
+  readonly pausedScheduleCount: number;
+  readonly failedScheduleCount: number;
+  readonly latestRunStatus: ScheduledNewsletterJobRunStatus | null;
+  readonly latestRunAt: string | null;
+  readonly latestRunMessage: string | null;
 }
 
 export interface SavedNewsletterSubscriptionRecord {

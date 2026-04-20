@@ -5,7 +5,10 @@ import {
 } from "./persistence.js";
 import { isEmptyNewsletterError, sendNewsletterFromPayload } from "./delivery.js";
 import { type NewsletterSendExecution } from "./delivery.js";
-import { type NewsletterSendPayload } from "./types.js";
+import {
+  type NewsletterSendPayload,
+  type ScheduledNewsletterRunRecord,
+} from "./types.js";
 
 const DEFAULT_POLL_INTERVAL_MS = 30 * 1000;
 
@@ -138,7 +141,7 @@ export class NewsletterScheduleProcessor {
   }
 
   private async appendRunLog(
-    input: Parameters<Pick<ScheduledNewsletterRunStore, "append">["append"]>[0],
+    input: Omit<ScheduledNewsletterRunRecord, "id" | "runAt"> & { readonly runAt?: string | null },
   ): Promise<void> {
     try {
       await this.runStore.append(input);

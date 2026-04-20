@@ -20,6 +20,8 @@ import {
   SentNewsletterStore,
   SendLogStore,
 } from "../newsletter/persistence.js";
+import { buildNewsletterSubscriptionActivity } from "../newsletter/subscription-activity.js";
+import { buildNewsletterOperationalSummary } from "../newsletter/summary.js";
 import {
   buildMarkdownFilename,
   renderNewsletterMarkdown,
@@ -149,6 +151,43 @@ export async function handleNewsletterRequest(
       sendJson(res, 200, {
         items: await store.list(Number.isInteger(limit) ? limit : 20),
       });
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/newsletter/summary") {
+    try {
+      const [
+        recipients,
+        recipientGroups,
+        searchPresets,
+        subscriptionTemplates,
+        schedules,
+        scheduleRuns,
+        sendLogs,
+      ] = await Promise.all([
+        new RecipientStore().list(),
+        new RecipientGroupStore().list(),
+        new SearchPresetStore().list(),
+        new NewsletterSubscriptionStore().list(),
+        new ScheduledNewsletterJobStore().list(300),
+        new ScheduledNewsletterRunStore().list(500),
+        new SendLogStore().list(500),
+      ]);
+
+      sendJson(res, 200, buildNewsletterOperationalSummary({
+        recipients,
+        recipientGroups,
+        searchPresets,
+        subscriptionTemplates,
+        schedules,
+        scheduleRuns,
+        sendLogs,
+      }));
     } catch (error: unknown) {
       sendJson(res, 500, {
         error: error instanceof Error ? error.message : String(error),
@@ -411,6 +450,25 @@ export async function handleNewsletterRequest(
     try {
       const store = new NewsletterSubscriptionStore();
       sendJson(res, 200, { items: await store.list() });
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/newsletter-subscription-activity") {
+    try {
+      const [subscriptions, schedules, runs] = await Promise.all([
+        new NewsletterSubscriptionStore().list(),
+        new ScheduledNewsletterJobStore().list(500),
+        new ScheduledNewsletterRunStore().list(500),
+      ]);
+
+      sendJson(res, 200, {
+        items: buildNewsletterSubscriptionActivity(subscriptions, schedules, runs),
+      });
     } catch (error: unknown) {
       sendJson(res, 500, {
         error: error instanceof Error ? error.message : String(error),

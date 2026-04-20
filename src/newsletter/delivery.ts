@@ -70,6 +70,8 @@ export function normalizeNewsletterContentPayload(
       recipientGroupName: null,
       searchPresetId: null,
       searchPresetName: null,
+      subscriptionTemplateId: null,
+      subscriptionTemplateName: null,
     };
   }
 
@@ -93,6 +95,8 @@ export function normalizeNewsletterContentPayload(
     recipientGroupName: nullableString(input.recipientGroupName),
     searchPresetId: nullableString(input.searchPresetId),
     searchPresetName: nullableString(input.searchPresetName),
+    subscriptionTemplateId: nullableString(input.subscriptionTemplateId),
+    subscriptionTemplateName: nullableString(input.subscriptionTemplateName),
   };
 }
 

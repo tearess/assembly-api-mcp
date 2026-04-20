@@ -443,6 +443,47 @@ export function buildNewsletterAppHtml(): string {
       line-height: 1.7;
     }
 
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .summary-card {
+      display: grid;
+      gap: 6px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(24, 53, 47, 0.05);
+      border: 1px solid rgba(24, 53, 47, 0.08);
+    }
+
+    .summary-kicker {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .summary-value {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .summary-note {
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    .summary-empty {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 14px;
+    }
+
     .recipient-row {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -616,6 +657,7 @@ export function buildNewsletterAppHtml(): string {
       .saved-preset-row { grid-template-columns: 1fr; }
       .recipient-row { grid-template-columns: 1fr; }
       .schedule-row { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr; }
       .actions-row { display: grid; grid-template-columns: 1fr; }
       .saved-preset-actions { width: 100%; display: grid; grid-template-columns: 1fr; }
       .primary-btn,
@@ -788,6 +830,7 @@ export function buildNewsletterAppHtml(): string {
               <div class="subtle">이메일 주소를 여러 개 추가하고, 전체 또는 선택 항목 기준으로 발송/저장할 수 있습니다.</div>
             </div>
           </div>
+          <div class="summary-grid" id="operationalSummaryGrid"></div>
 
           <div class="recipient-row">
             <input id="recipientInput" type="email" placeholder="recipient@example.com">
@@ -926,9 +969,11 @@ export function buildNewsletterAppHtml(): string {
       searchPresets: [],
       recipientGroups: [],
       subscriptionTemplates: [],
+      subscriptionActivityById: {},
       scheduleJobs: [],
       scheduleRunLogs: [],
       scheduleRunFilterJobId: "",
+      operationalSummary: null,
       recipients: [],
       sendLogs: [],
     };
@@ -960,6 +1005,7 @@ export function buildNewsletterAppHtml(): string {
     const scheduleList = document.getElementById("scheduleList");
     const scheduleRunFilterBar = document.getElementById("scheduleRunFilterBar");
     const scheduleRunList = document.getElementById("scheduleRunList");
+    const operationalSummaryGrid = document.getElementById("operationalSummaryGrid");
     const sendLogList = document.getElementById("sendLogList");
     const subjectInput = document.getElementById("subjectInput");
     const introInput = document.getElementById("introInput");
@@ -986,6 +1032,7 @@ export function buildNewsletterAppHtml(): string {
     renderRecipients();
     renderRecipientGroups();
     renderSubscriptionTemplates();
+    renderOperationalSummary();
     renderScheduleJobs();
     renderScheduleRuns();
     renderSendLogs();
@@ -996,11 +1043,15 @@ export function buildNewsletterAppHtml(): string {
     void loadSearchPresets();
     void loadRecipientGroups();
     void loadSubscriptionTemplates();
+    void loadSubscriptionActivities();
+    void loadOperationalSummary();
     void loadSchedules();
     void loadScheduleRuns();
     void loadRecipients();
     void loadSendLogs();
     window.setInterval(() => {
+      void loadSubscriptionActivities();
+      void loadOperationalSummary();
       void loadSchedules();
       void loadScheduleRuns();
       void loadSendLogs();
@@ -1248,6 +1299,8 @@ export function buildNewsletterAppHtml(): string {
           '</div>' +
           '<div class="saved-preset-actions">' +
           '<button type="button" class="ghost-btn" data-load-subscription="' + escapeHtml(subscription.id) + '">불러오기</button>' +
+          '<button type="button" class="ghost-btn" data-send-subscription="' + escapeHtml(subscription.id) + '">즉시 발송</button>' +
+          '<button type="button" class="ghost-btn" data-download-subscription="' + escapeHtml(subscription.id) + '">Markdown 저장</button>' +
           '<button type="button" class="ghost-btn" data-schedule-subscription="' + escapeHtml(subscription.id) + '">현재 시각으로 예약</button>' +
           '<button type="button" class="danger-btn" data-delete-subscription="' + escapeHtml(subscription.id) + '">삭제</button>' +
           '</div>' +
@@ -1257,6 +1310,18 @@ export function buildNewsletterAppHtml(): string {
       savedSubscriptionList.querySelectorAll("button[data-load-subscription]").forEach((button) => {
         button.addEventListener("click", async () => {
           await loadSubscriptionTemplate(button.dataset.loadSubscription);
+        });
+      });
+
+      savedSubscriptionList.querySelectorAll("button[data-send-subscription]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await sendSubscriptionTemplate(button.dataset.sendSubscription);
+        });
+      });
+
+      savedSubscriptionList.querySelectorAll("button[data-download-subscription]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await downloadSubscriptionMarkdown(button.dataset.downloadSubscription);
         });
       });
 
@@ -1286,8 +1351,25 @@ export function buildNewsletterAppHtml(): string {
         : '수신자 스냅샷';
       const recurrence = getScheduleRecurrenceLabel(subscription.recurrence || "once");
       const newOnly = subscription.onlyNewResults ? " · 새 법안만" : "";
+      const activity = getSubscriptionActivitySummary(subscription);
       return keyword + " · " + dateRange + " · " + linkedPreset + " · " + recipientSource + " · 수신자 " +
-        String((subscription.recipients || []).length) + "명 · " + recurrence + newOnly;
+        String((subscription.recipients || []).length) + "명 · " + recurrence + newOnly + activity;
+    }
+
+    function getSubscriptionActivitySummary(subscription) {
+      const activity = state.subscriptionActivityById[subscription.id];
+      if (!activity || activity.scheduleCount === 0) {
+        return " · 연결 예약 없음";
+      }
+
+      const latestLabel = activity.latestRunStatus
+        ? getScheduleRunResultLabel(activity.latestRunStatus) + (activity.latestRunAt ? " " + activity.latestRunAt : "")
+        : "최근 실행 없음";
+      return " · 연결 예약 " + String(activity.scheduleCount) + "개" +
+        " (활성 " + String(activity.activeScheduleCount) +
+        ", 일시정지 " + String(activity.pausedScheduleCount) +
+        ", 실패 " + String(activity.failedScheduleCount) +
+        ") · " + latestLabel;
     }
 
     function applyQuerySnapshot(query, options) {
@@ -1784,6 +1866,62 @@ export function buildNewsletterAppHtml(): string {
       });
     }
 
+    function renderOperationalSummary() {
+      const summary = state.operationalSummary;
+      if (!summary) {
+        operationalSummaryGrid.innerHTML = [
+          createSummaryCard("현재 수신자", "-", "수신자와 그룹 현황을 불러오는 중입니다."),
+          createSummaryCard("검색 저장", "-", "검색 preset과 구독 템플릿 수를 계산합니다."),
+          createSummaryCard("활성 예약", "-", "대기/발송 중 예약을 집계합니다."),
+          createSummaryCard("일시정지 예약", "-", "일시정지/실패 예약을 확인합니다."),
+          createSummaryCard("최근 7일 예약 성공", "-", "예약 실행 이력에서 성공 건수를 집계합니다."),
+          createSummaryCard("최근 7일 메일 발송", "-", "수신자 단위 발송 로그를 집계합니다."),
+        ].join("");
+        return;
+      }
+
+      operationalSummaryGrid.innerHTML = [
+        createSummaryCard(
+          "현재 수신자",
+          String(summary.recipientCount) + "명",
+          "수신자 그룹 " + String(summary.recipientGroupCount) + "개",
+        ),
+        createSummaryCard(
+          "검색 저장",
+          "preset " + String(summary.searchPresetCount) + "개",
+          "구독 템플릿 " + String(summary.subscriptionTemplateCount) + "개",
+        ),
+        createSummaryCard(
+          "활성 예약",
+          String(summary.scheduleCounts.active) + "개",
+          "전체 예약 " + String(summary.scheduleCounts.total) + "개",
+        ),
+        createSummaryCard(
+          "일시정지 예약",
+          String(summary.scheduleCounts.paused) + "개",
+          "실패 상태 " + String(summary.scheduleCounts.failed) + "개",
+        ),
+        createSummaryCard(
+          "최근 " + String(summary.scheduleRunWindowDays) + "일 예약 성공",
+          String(summary.scheduleRunCounts.sent) + "회",
+          "건너뜀 " + String(summary.scheduleRunCounts.skipped) + "회 · 실패 " + String(summary.scheduleRunCounts.failed) + "회",
+        ),
+        createSummaryCard(
+          "최근 " + String(summary.scheduleRunWindowDays) + "일 메일 발송",
+          String(summary.sendLogCounts.sent) + "건",
+          "실패 " + String(summary.sendLogCounts.failed) + "건 · 기준 " + summary.asOf,
+        ),
+      ].join("");
+    }
+
+    function createSummaryCard(label, value, note) {
+      return '<div class="summary-card">' +
+        '<div class="summary-kicker">' + escapeHtml(label) + '</div>' +
+        '<div class="summary-value">' + escapeHtml(value) + '</div>' +
+        '<div class="summary-note">' + escapeHtml(note) + '</div>' +
+        '</div>';
+    }
+
     function renderScheduleJobs() {
       if (!state.scheduleJobs.length) {
         scheduleList.innerHTML = '<span class="subtle">예약된 발송 작업이 없습니다.</span>';
@@ -1826,6 +1964,9 @@ export function buildNewsletterAppHtml(): string {
         const presetMeta = job.payload.searchPresetName
           ? ' · 기준 preset ' + escapeHtml(job.payload.searchPresetName)
           : '';
+        const subscriptionMeta = job.payload.subscriptionTemplateName
+          ? ' · 구독 템플릿 ' + escapeHtml(job.payload.subscriptionTemplateName)
+          : '';
         const recipientGroupMeta = job.payload.recipientGroupName
           ? ' · 수신자 그룹 ' + escapeHtml(job.payload.recipientGroupName)
           : '';
@@ -1837,6 +1978,7 @@ export function buildNewsletterAppHtml(): string {
           '<div class="log-meta">예약 시각 ' + escapeHtml(formatScheduledAt(job.scheduledAt)) +
           ' · 반복 ' + escapeHtml(getScheduleRecurrenceLabel(job.recurrence)) +
           presetMeta +
+          subscriptionMeta +
           recipientGroupMeta +
           newOnlyMeta +
           ' · 수신자 ' + escapeHtml(String((job.payload.recipients || []).length)) + '명' +
@@ -2155,6 +2297,7 @@ export function buildNewsletterAppHtml(): string {
         );
         await loadRecipients();
         await loadSendLogs();
+        await loadOperationalSummary();
       } catch (error) {
         setStatus(composerStatus, error.message || "이메일 발송에 실패했습니다.", "error");
       }
@@ -2191,6 +2334,8 @@ export function buildNewsletterAppHtml(): string {
         renderScheduleJobs();
         scheduleAtInput.value = getDefaultScheduleAtValue();
         scheduleRecurrenceSelect.value = "once";
+        await loadSubscriptionActivities();
+        await loadOperationalSummary();
         setStatus(
           composerStatus,
           buildScheduleRegisteredMessage(schedulePreset, onlyNewResults),
@@ -2267,6 +2412,12 @@ export function buildNewsletterAppHtml(): string {
       const searchPresetName = schedulePreset
         ? schedulePreset.name
         : (options && typeof options.searchPresetName === "string" ? options.searchPresetName : null);
+      const subscriptionTemplateId = options && typeof options.subscriptionTemplateId === "string"
+        ? options.subscriptionTemplateId
+        : null;
+      const subscriptionTemplateName = options && typeof options.subscriptionTemplateName === "string"
+        ? options.subscriptionTemplateName
+        : null;
       const selectedRecipientGroup = getSelectedRecipientGroup();
       const hasRecipientGroupId = Boolean(
         options && Object.prototype.hasOwnProperty.call(options, "recipientGroupId"),
@@ -2310,6 +2461,8 @@ export function buildNewsletterAppHtml(): string {
         recipientGroupName,
         searchPresetId,
         searchPresetName,
+        subscriptionTemplateId,
+        subscriptionTemplateName,
       };
     }
 
@@ -2384,6 +2537,7 @@ export function buildNewsletterAppHtml(): string {
         }
         state.searchPresets = data.items || [];
         renderSearchPresets();
+        await loadOperationalSummary();
         setStatus(searchStatus, "검색 preset을 저장했습니다.", "success");
       } catch (error) {
         setStatus(searchStatus, error.message || "검색 preset 저장에 실패했습니다.", "error");
@@ -2425,6 +2579,8 @@ export function buildNewsletterAppHtml(): string {
         state.subscriptionTemplates = data.items || [];
         renderSubscriptionTemplates();
         subscriptionNameInput.value = "";
+        await loadSubscriptionActivities();
+        await loadOperationalSummary();
         setStatus(composerStatus, "구독 템플릿을 저장했습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "구독 템플릿 저장에 실패했습니다.", "error");
@@ -2444,6 +2600,7 @@ export function buildNewsletterAppHtml(): string {
         }
         state.searchPresets = data.items || [];
         renderSearchPresets();
+        await loadOperationalSummary();
         setStatus(searchStatus, "검색 preset을 삭제했습니다.", "success");
       } catch (error) {
         setStatus(searchStatus, error.message || "검색 preset 삭제에 실패했습니다.", "error");
@@ -2552,6 +2709,8 @@ export function buildNewsletterAppHtml(): string {
           : (subscription.recipientGroupName || null),
         searchPresetId: resolved.linkedPreset ? resolved.linkedPreset.id : (subscription.searchPresetId || null),
         searchPresetName: resolved.linkedPreset ? resolved.linkedPreset.name : (subscription.searchPresetName || null),
+        subscriptionTemplateId: subscription.id,
+        subscriptionTemplateName: subscription.name,
       });
     }
 
@@ -2587,6 +2746,8 @@ export function buildNewsletterAppHtml(): string {
         state.scheduleJobs = data.items || [];
         renderScheduleJobs();
         scheduleAtInput.value = getDefaultScheduleAtValue();
+        await loadSubscriptionActivities();
+        await loadOperationalSummary();
         setStatus(
           composerStatus,
           buildScheduleRegisteredMessage(resolved.linkedPreset, subscription.onlyNewResults) +
@@ -2595,6 +2756,79 @@ export function buildNewsletterAppHtml(): string {
         );
       } catch (error) {
         setStatus(composerStatus, error.message || "구독 템플릿 예약 등록에 실패했습니다.", "error");
+      }
+    }
+
+    async function sendSubscriptionTemplate(id) {
+      if (!id) return;
+
+      const subscription = state.subscriptionTemplates.find((item) => item.id === id);
+      if (!subscription) {
+        setStatus(composerStatus, "선택한 구독 템플릿을 찾지 못했습니다.", "error");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/newsletter/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildNewsletterPayloadFromSubscription(subscription)),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "구독 템플릿 즉시 발송에 실패했습니다.");
+        }
+
+        setStatus(
+          composerStatus,
+          '구독 템플릿 "' + subscription.name + '" 즉시 발송 완료 · 성공 ' + data.sent + '건 / 실패 ' + data.failed + '건',
+          data.failed === 0 ? "success" : "error",
+        );
+        await loadRecipients();
+        await loadSendLogs();
+        await loadOperationalSummary();
+      } catch (error) {
+        setStatus(composerStatus, error.message || "구독 템플릿 즉시 발송에 실패했습니다.", "error");
+      }
+    }
+
+    async function downloadSubscriptionMarkdown(id) {
+      if (!id) return;
+
+      const subscription = state.subscriptionTemplates.find((item) => item.id === id);
+      if (!subscription) {
+        setStatus(composerStatus, "선택한 구독 템플릿을 찾지 못했습니다.", "error");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/newsletter/markdown", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildNewsletterPayloadFromSubscription(subscription)),
+        });
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "구독 템플릿 Markdown 생성에 실패했습니다.");
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const disposition = response.headers.get("Content-Disposition") || "";
+        const match = disposition.match(/filename="([^"]+)"/);
+        link.href = url;
+        link.download = match ? match[1] : "legislation-newsletter.md";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setStatus(
+          composerStatus,
+          '구독 템플릿 "' + subscription.name + '" Markdown 파일을 생성했습니다.',
+          "success",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "구독 템플릿 Markdown 생성에 실패했습니다.", "error");
       }
     }
 
@@ -2612,6 +2846,8 @@ export function buildNewsletterAppHtml(): string {
 
         state.subscriptionTemplates = data.items || [];
         renderSubscriptionTemplates();
+        await loadSubscriptionActivities();
+        await loadOperationalSummary();
         setStatus(composerStatus, "구독 템플릿을 삭제했습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "구독 템플릿 삭제에 실패했습니다.", "error");
@@ -2699,6 +2935,44 @@ export function buildNewsletterAppHtml(): string {
       }
     }
 
+    async function loadSubscriptionActivities() {
+      try {
+        const response = await fetch("/api/newsletter-subscription-activity");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "구독 템플릿 활동 요약을 불러오지 못했습니다.");
+        }
+
+        const activityById = {};
+        (data.items || []).forEach((item) => {
+          if (item && typeof item.subscriptionId === "string" && item.subscriptionId) {
+            activityById[item.subscriptionId] = item;
+          }
+        });
+        state.subscriptionActivityById = activityById;
+        renderSubscriptionTemplates();
+      } catch {
+        state.subscriptionActivityById = {};
+      }
+    }
+
+    async function loadOperationalSummary() {
+      try {
+        const response = await fetch("/api/newsletter/summary");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "운영 요약을 불러오지 못했습니다.");
+        }
+        state.operationalSummary = data;
+        renderOperationalSummary();
+      } catch (error) {
+        if (!state.operationalSummary) {
+          operationalSummaryGrid.innerHTML =
+            '<div class="summary-empty">' + escapeHtml(error.message || "운영 요약을 불러오지 못했습니다.") + '</div>';
+        }
+      }
+    }
+
     async function loadSchedules() {
       try {
         const response = await fetch("/api/newsletter/schedules?limit=8");
@@ -2708,9 +2982,41 @@ export function buildNewsletterAppHtml(): string {
         }
         state.scheduleJobs = data.items || [];
         renderScheduleJobs();
+        await loadSubscriptionActivities();
       } catch (error) {
         scheduleList.innerHTML = '<span class="subtle">' + escapeHtml(error.message || "예약 발송 목록을 불러오지 못했습니다.") + '</span>';
       }
+    }
+
+    async function loadScheduleRuns() {
+      try {
+        const params = new URLSearchParams({ limit: "8" });
+        if (state.scheduleRunFilterJobId) {
+          params.set("scheduleJobId", state.scheduleRunFilterJobId);
+        }
+        const response = await fetch("/api/newsletter/schedule-runs?" + params.toString());
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "예약 실행 이력을 불러오지 못했습니다.");
+        }
+        state.scheduleRunLogs = data.items || [];
+        renderScheduleRuns();
+        await loadSubscriptionActivities();
+      } catch (error) {
+        scheduleRunList.innerHTML = '<span class="subtle">' + escapeHtml(error.message || "예약 실행 이력을 불러오지 못했습니다.") + '</span>';
+      }
+    }
+
+    async function setScheduleRunFilter(jobId) {
+      state.scheduleRunFilterJobId = jobId || "";
+      renderScheduleJobs();
+      await loadScheduleRuns();
+    }
+
+    async function clearScheduleRunFilter() {
+      state.scheduleRunFilterJobId = "";
+      renderScheduleJobs();
+      await loadScheduleRuns();
     }
 
     async function cancelScheduledJob(id) {
@@ -2729,6 +3035,8 @@ export function buildNewsletterAppHtml(): string {
         }
         state.scheduleJobs = data.items || [];
         renderScheduleJobs();
+        await loadSubscriptionActivities();
+        await loadOperationalSummary();
         setStatus(composerStatus, "예약 발송을 취소했습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "예약 발송 취소에 실패했습니다.", "error");
@@ -2753,6 +3061,8 @@ export function buildNewsletterAppHtml(): string {
         }
         state.scheduleJobs = data.items || [];
         renderScheduleJobs();
+        await loadSubscriptionActivities();
+        await loadOperationalSummary();
         setStatus(composerStatus, "예약 발송을 일시정지했습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "예약 발송 일시정지에 실패했습니다.", "error");
@@ -2777,6 +3087,8 @@ export function buildNewsletterAppHtml(): string {
         }
         state.scheduleJobs = data.items || [];
         renderScheduleJobs();
+        await loadSubscriptionActivities();
+        await loadOperationalSummary();
         setStatus(composerStatus, "예약 발송을 다시 대기 상태로 돌렸습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "예약 발송 재개에 실패했습니다.", "error");

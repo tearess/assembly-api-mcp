@@ -44,6 +44,7 @@ describe("newsletter/scheduler", () => {
     const markSent = vi.fn(async () => true);
     const markSkipped = vi.fn(async () => true);
     const markFailed = vi.fn(async () => true);
+    const appendRunLog = vi.fn(async () => ({}));
 
     const processor = new NewsletterScheduleProcessor(
       {} as never,
@@ -58,6 +59,9 @@ describe("newsletter/scheduler", () => {
       async () => {
         throw new Error(EMPTY_NEWSLETTER_ERROR_MESSAGE);
       },
+      {
+        append: appendRunLog,
+      } as never,
     );
 
     await (processor as any).tick();
@@ -71,11 +75,17 @@ describe("newsletter/scheduler", () => {
     );
     expect(markSent).not.toHaveBeenCalled();
     expect(markFailed).not.toHaveBeenCalled();
+    expect(appendRunLog).toHaveBeenCalledWith(expect.objectContaining({
+      scheduleJobId: "job-1",
+      status: "skipped",
+      message: "새로 발견된 법안이 없어 이번 회차를 건너뛰었습니다.",
+    }));
   });
 
   it("일반 오류는 실패 상태로 남긴다", async () => {
     const markSkipped = vi.fn(async () => true);
     const markFailed = vi.fn(async () => true);
+    const appendRunLog = vi.fn(async () => ({}));
 
     const processor = new NewsletterScheduleProcessor(
       {} as never,
@@ -90,6 +100,9 @@ describe("newsletter/scheduler", () => {
       async () => {
         throw new Error("SMTP timeout");
       },
+      {
+        append: appendRunLog,
+      } as never,
     );
 
     await (processor as any).tick();
@@ -97,10 +110,16 @@ describe("newsletter/scheduler", () => {
     expect(markSkipped).not.toHaveBeenCalled();
     expect(markFailed).toHaveBeenCalledTimes(1);
     expect(markFailed).toHaveBeenCalledWith("job-1", "SMTP timeout");
+    expect(appendRunLog).toHaveBeenCalledWith(expect.objectContaining({
+      scheduleJobId: "job-1",
+      status: "failed",
+      message: "SMTP timeout",
+    }));
   });
 
   it("새 법안만 발송 설정이면 기존 delivered bill id를 제외하고 새 결과를 저장한다", async () => {
     const markSent = vi.fn(async () => true);
+    const appendRunLog = vi.fn(async () => ({}));
 
     const processor = new NewsletterScheduleProcessor(
       {} as never,
@@ -150,6 +169,9 @@ describe("newsletter/scheduler", () => {
           logs: [],
         };
       },
+      {
+        append: appendRunLog,
+      } as never,
     );
 
     await (processor as any).tick();
@@ -160,5 +182,12 @@ describe("newsletter/scheduler", () => {
       expect.any(Date),
       ["BILL_NEW_001"],
     );
+    expect(appendRunLog).toHaveBeenCalledWith(expect.objectContaining({
+      scheduleJobId: "job-1",
+      status: "sent",
+      itemCount: 1,
+      sentCount: 1,
+      failedCount: 0,
+    }));
   });
 });

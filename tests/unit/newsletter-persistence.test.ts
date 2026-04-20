@@ -8,6 +8,7 @@ import {
   RecipientStore,
   SearchPresetStore,
   ScheduledNewsletterJobStore,
+  ScheduledNewsletterRunStore,
   SentNewsletterStore,
   SendLogStore,
 } from "../../src/newsletter/persistence.js";
@@ -192,6 +193,57 @@ describe("newsletter/persistence", () => {
       expect(saved.every((item) => item.snapshotAvailable === true)).toBe(true);
       const fetched = await store.get(saved[0]!.id);
       expect(fetched?.id).toBe(saved[0]!.id);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("예약 실행 로그를 저장하고 예약별로 다시 조회할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterRunStore(dir);
+      await store.append({
+        scheduleJobId: "job-1",
+        scheduleSubject: "AI 정책 브리핑",
+        recurrence: "daily",
+        status: "sent",
+        message: null,
+        keyword: "인공지능",
+        itemCount: 3,
+        sentCount: 2,
+        failedCount: 1,
+        deliveryJobId: "delivery-1",
+        runAt: "2026-04-20 10:30:00",
+      });
+      await store.append({
+        scheduleJobId: "job-2",
+        scheduleSubject: "보건의료 브리핑",
+        recurrence: "weekly",
+        status: "failed",
+        message: "SMTP timeout",
+        keyword: "보건의료",
+        itemCount: 0,
+        sentCount: 0,
+        failedCount: 0,
+        deliveryJobId: null,
+        runAt: "2026-04-21 09:00:00",
+      });
+
+      const all = await store.list();
+      expect(all).toHaveLength(2);
+      expect(all[0]).toMatchObject({
+        scheduleJobId: "job-2",
+        status: "failed",
+      });
+
+      const filtered = await store.list(10, "job-1");
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toMatchObject({
+        scheduleJobId: "job-1",
+        status: "sent",
+        deliveryJobId: "delivery-1",
+      });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

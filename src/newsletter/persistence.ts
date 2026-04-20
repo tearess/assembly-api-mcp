@@ -904,12 +904,15 @@ function normalizeSendLogRecord(item: SendLogRecord): SendLogRecord {
 function normalizeScheduledNewsletterRunRecord(
   item: ScheduledNewsletterRunRecord,
 ): ScheduledNewsletterRunRecord {
+  const scheduleJobId = normalizeOptionalText(item.scheduleJobId);
+  if (!scheduleJobId) {
+    throw new Error("예약 실행 로그에는 scheduleJobId가 필요합니다.");
+  }
   const subject = normalizeOptionalText(item.scheduleSubject) ?? "[입법예고 뉴스레터]";
 
   return {
     id: normalizeOptionalText(item.id) ?? randomUUID(),
-    scheduleJobId: normalizeOptionalText(item.scheduleJobId)
-      ?? (() => { throw new Error("예약 실행 로그에는 scheduleJobId가 필요합니다."); })(),
+    scheduleJobId,
     scheduleSubject: subject,
     recurrence: normalizeRecurrence(item.recurrence),
     status: normalizeLastRunStatus(item.status) ?? "failed",
@@ -1049,6 +1052,8 @@ function normalizeNewsletterSendPayload(
     recipientGroupName: normalizeOptionalText(payload.recipientGroupName),
     searchPresetId: normalizeOptionalText(payload.searchPresetId),
     searchPresetName: normalizeOptionalText(payload.searchPresetName),
+    subscriptionTemplateId: normalizeOptionalText(payload.subscriptionTemplateId),
+    subscriptionTemplateName: normalizeOptionalText(payload.subscriptionTemplateName),
     recipients: payload.recipients.map((recipient) => normalizeEmail(recipient)),
   };
 }
