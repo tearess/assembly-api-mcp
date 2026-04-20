@@ -8,7 +8,13 @@ import {
 } from "./email.js";
 import { createLegislationEnrichmentService } from "./legislation-enricher.js";
 import { createLegislationSearchService } from "./legislation-search.js";
-import { RecipientStore, SearchPresetStore, SendLogStore, SentNewsletterStore } from "./persistence.js";
+import {
+  RecipientGroupStore,
+  RecipientStore,
+  SearchPresetStore,
+  SendLogStore,
+  SentNewsletterStore,
+} from "./persistence.js";
 import { renderNewsletterHtml } from "./render-html.js";
 import { renderNewsletterMarkdown } from "./render-markdown.js";
 import {
@@ -60,6 +66,8 @@ export function normalizeNewsletterContentPayload(
       includeAllResults: false,
       onlyNewResults: false,
       excludeBillIds: [],
+      recipientGroupId: null,
+      recipientGroupName: null,
       searchPresetId: null,
       searchPresetName: null,
     };
@@ -81,6 +89,8 @@ export function normalizeNewsletterContentPayload(
     excludeBillIds: Array.isArray(input.excludeBillIds)
       ? input.excludeBillIds.filter((item): item is string => typeof item === "string")
       : [],
+    recipientGroupId: nullableString(input.recipientGroupId),
+    recipientGroupName: nullableString(input.recipientGroupName),
     searchPresetId: nullableString(input.searchPresetId),
     searchPresetName: nullableString(input.searchPresetName),
   };
@@ -146,14 +156,45 @@ export async function resolveNewsletterContentPayload(
   };
 }
 
+export async function resolveNewsletterSendPayload(
+  payload: NewsletterSendPayload,
+  presetStore: Pick<SearchPresetStore, "get"> = new SearchPresetStore(),
+  recipientGroupStore: Pick<RecipientGroupStore, "get"> = new RecipientGroupStore(),
+): Promise<NewsletterSendPayload> {
+  const resolvedContent = await resolveNewsletterContentPayload(payload, presetStore);
+  const groupId = payload.recipientGroupId?.trim();
+  if (!groupId) {
+    return {
+      ...resolvedContent,
+      recipients: payload.recipients,
+    };
+  }
+
+  const group = await recipientGroupStore.get(groupId);
+  if (!group) {
+    return {
+      ...resolvedContent,
+      recipients: payload.recipients,
+    };
+  }
+
+  return {
+    ...resolvedContent,
+    recipientGroupId: group.id,
+    recipientGroupName: group.name,
+    recipients: group.emails,
+  };
+}
+
 export async function sendNewsletterFromPayload(
   payload: NewsletterSendPayload,
   config: AppConfig,
 ): Promise<NewsletterSendExecution> {
-  const document = await buildNewsletterDocumentFromPayload(payload, config);
+  const resolvedPayload = await resolveNewsletterSendPayload(payload);
+  const document = await buildNewsletterDocumentFromPayload(resolvedPayload, config);
   const html = renderNewsletterHtml(document);
   const markdown = renderNewsletterMarkdown(document);
-  return sendPreparedNewsletter(document, html, markdown, payload.recipients);
+  return sendPreparedNewsletter(document, html, markdown, resolvedPayload.recipients);
 }
 
 export async function resendNewsletterFromSnapshot(

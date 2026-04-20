@@ -525,12 +525,14 @@ export function buildNewsletterAppHtml(): string {
       color: var(--accent-2);
     }
 
-    .log-status.failed {
-      color: var(--danger);
-    }
-
+    .log-status.paused,
+    .log-status.skipped,
     .log-status.cancelled {
       color: var(--muted);
+    }
+
+    .log-status.failed {
+      color: var(--danger);
     }
 
     .status-line {
@@ -802,6 +804,12 @@ export function buildNewsletterAppHtml(): string {
           <div class="saved-preset-list" id="savedRecipientGroupList">
             <span class="subtle">저장된 수신자 그룹이 없습니다.</span>
           </div>
+          <label>
+            구독/예약 수신자 그룹 연결
+            <select id="subscriptionRecipientGroupSelect">
+              <option value="">현재 수신자 목록 스냅샷 사용</option>
+            </select>
+          </label>
 
           <label>
             메일 제목
@@ -851,9 +859,29 @@ export function buildNewsletterAppHtml(): string {
             <input id="scheduleOnlyNewInput" type="checkbox">
             반복 예약에서는 새로 발견된 법안만 발송
           </label>
+          <div class="saved-preset-row">
+            <label>
+              구독 템플릿 이름
+              <input id="subscriptionNameInput" type="text" placeholder="예: AI 정책 브리핑 구독">
+            </label>
+            <button id="saveSubscriptionBtn" class="accent-btn" type="button">현재 설정 저장</button>
+          </div>
+          <div class="saved-preset-list" id="savedSubscriptionList">
+            <span class="subtle">저장된 구독 템플릿이 없습니다.</span>
+          </div>
           <div class="status-line" id="composerStatus"></div>
           <div class="log-list" id="scheduleList">
             <span class="subtle">예약 발송 목록을 불러오는 중입니다.</span>
+          </div>
+          <div class="section-head" style="margin-top: 16px;">
+            <div>
+              <h3 style="margin-bottom: 4px;">최근 예약 실행 이력</h3>
+              <div class="subtle">성공, 건너뜀, 실패 기록을 최근 순으로 확인합니다.</div>
+            </div>
+          </div>
+          <div class="saved-preset-actions" id="scheduleRunFilterBar" style="justify-content: flex-start;" hidden></div>
+          <div class="log-list" id="scheduleRunList">
+            <span class="subtle">예약 실행 이력을 불러오는 중입니다.</span>
           </div>
           <div class="log-list" id="sendLogList">
             <span class="subtle">발송 로그를 불러오는 중입니다.</span>
@@ -897,7 +925,10 @@ export function buildNewsletterAppHtml(): string {
       previewItemId: null,
       searchPresets: [],
       recipientGroups: [],
+      subscriptionTemplates: [],
       scheduleJobs: [],
+      scheduleRunLogs: [],
+      scheduleRunFilterJobId: "",
       recipients: [],
       sendLogs: [],
     };
@@ -919,11 +950,16 @@ export function buildNewsletterAppHtml(): string {
     const recipientList = document.getElementById("recipientList");
     const groupNameInput = document.getElementById("groupNameInput");
     const savedRecipientGroupList = document.getElementById("savedRecipientGroupList");
+    const subscriptionRecipientGroupSelect = document.getElementById("subscriptionRecipientGroupSelect");
     const scheduleAtInput = document.getElementById("scheduleAtInput");
     const scheduleRecurrenceSelect = document.getElementById("scheduleRecurrenceSelect");
     const schedulePresetSelect = document.getElementById("schedulePresetSelect");
     const scheduleOnlyNewInput = document.getElementById("scheduleOnlyNewInput");
+    const subscriptionNameInput = document.getElementById("subscriptionNameInput");
+    const savedSubscriptionList = document.getElementById("savedSubscriptionList");
     const scheduleList = document.getElementById("scheduleList");
+    const scheduleRunFilterBar = document.getElementById("scheduleRunFilterBar");
+    const scheduleRunList = document.getElementById("scheduleRunList");
     const sendLogList = document.getElementById("sendLogList");
     const subjectInput = document.getElementById("subjectInput");
     const introInput = document.getElementById("introInput");
@@ -949,7 +985,9 @@ export function buildNewsletterAppHtml(): string {
     scheduleRecurrenceSelect.value = "once";
     renderRecipients();
     renderRecipientGroups();
+    renderSubscriptionTemplates();
     renderScheduleJobs();
+    renderScheduleRuns();
     renderSendLogs();
     renderResults();
     renderPagination();
@@ -957,11 +995,14 @@ export function buildNewsletterAppHtml(): string {
     renderSchedulePresetOptions();
     void loadSearchPresets();
     void loadRecipientGroups();
+    void loadSubscriptionTemplates();
     void loadSchedules();
+    void loadScheduleRuns();
     void loadRecipients();
     void loadSendLogs();
     window.setInterval(() => {
       void loadSchedules();
+      void loadScheduleRuns();
       void loadSendLogs();
     }, 30000);
 
@@ -1049,6 +1090,17 @@ export function buildNewsletterAppHtml(): string {
       if (event.key === "Enter") {
         event.preventDefault();
         await saveRecipientGroup();
+      }
+    });
+
+    document.getElementById("saveSubscriptionBtn").addEventListener("click", async () => {
+      await saveSubscriptionTemplate();
+    });
+
+    subscriptionNameInput.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        await saveSubscriptionTemplate();
       }
     });
 
@@ -1180,6 +1232,88 @@ export function buildNewsletterAppHtml(): string {
           await deleteSearchPreset(button.dataset.deletePreset);
         });
       });
+    }
+
+    function renderSubscriptionTemplates() {
+      if (!state.subscriptionTemplates.length) {
+        savedSubscriptionList.innerHTML = '<span class="subtle">저장된 구독 템플릿이 없습니다.</span>';
+        return;
+      }
+
+      savedSubscriptionList.innerHTML = state.subscriptionTemplates.map((subscription) => {
+        return '<div class="saved-preset-item">' +
+          '<div>' +
+          '<strong>' + escapeHtml(subscription.name) + '</strong>' +
+          '<div class="saved-preset-meta">' + escapeHtml(getSubscriptionSummary(subscription)) + '</div>' +
+          '</div>' +
+          '<div class="saved-preset-actions">' +
+          '<button type="button" class="ghost-btn" data-load-subscription="' + escapeHtml(subscription.id) + '">불러오기</button>' +
+          '<button type="button" class="ghost-btn" data-schedule-subscription="' + escapeHtml(subscription.id) + '">현재 시각으로 예약</button>' +
+          '<button type="button" class="danger-btn" data-delete-subscription="' + escapeHtml(subscription.id) + '">삭제</button>' +
+          '</div>' +
+          '</div>';
+      }).join("");
+
+      savedSubscriptionList.querySelectorAll("button[data-load-subscription]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await loadSubscriptionTemplate(button.dataset.loadSubscription);
+        });
+      });
+
+      savedSubscriptionList.querySelectorAll("button[data-schedule-subscription]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await scheduleSubscriptionTemplate(button.dataset.scheduleSubscription);
+        });
+      });
+
+      savedSubscriptionList.querySelectorAll("button[data-delete-subscription]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await deleteSubscriptionTemplate(button.dataset.deleteSubscription);
+        });
+      });
+    }
+
+    function getSubscriptionSummary(subscription) {
+      const keyword = subscription.query.keyword ? '키워드 ' + subscription.query.keyword : '키워드 없음';
+      const dateRange = subscription.query.datePreset === "custom"
+        ? ((subscription.query.dateFrom || "미정") + " ~ " + (subscription.query.dateTo || "미정"))
+        : getDatePresetLabel(subscription.query.datePreset);
+      const linkedPreset = subscription.searchPresetName
+        ? 'preset ' + subscription.searchPresetName
+        : '현재 조건 스냅샷';
+      const recipientSource = subscription.recipientGroupName
+        ? '그룹 ' + subscription.recipientGroupName
+        : '수신자 스냅샷';
+      const recurrence = getScheduleRecurrenceLabel(subscription.recurrence || "once");
+      const newOnly = subscription.onlyNewResults ? " · 새 법안만" : "";
+      return keyword + " · " + dateRange + " · " + linkedPreset + " · " + recipientSource + " · 수신자 " +
+        String((subscription.recipients || []).length) + "명 · " + recurrence + newOnly;
+    }
+
+    function applyQuerySnapshot(query, options) {
+      const linkedPresetId = options && options.linkedPresetId ? options.linkedPresetId : "";
+      const statusMessage = options && options.statusMessage ? options.statusMessage : "";
+
+      keywordInput.value = query.keyword || "";
+      noticeScopeSelect.value = query.noticeScope || "include_closed";
+      sortBySelect.value = query.sortBy || "relevance";
+      pageSizeSelect.value = String(query.pageSize || DEFAULT_PAGE_SIZE);
+      schedulePresetSelect.value = linkedPresetId;
+
+      if (query.datePreset === "custom") {
+        applyPreset("custom");
+        dateFromInput.value = query.dateFrom || "";
+        dateToInput.value = query.dateTo || "";
+        state.query.dateFrom = query.dateFrom || "";
+        state.query.dateTo = query.dateTo || "";
+      } else {
+        applyPreset(query.datePreset || "1m");
+      }
+
+      startNewSearch();
+      if (statusMessage) {
+        setStatus(searchStatus, statusMessage, "success");
+      }
     }
 
     function renderSchedulePresetOptions() {
@@ -1386,6 +1520,7 @@ export function buildNewsletterAppHtml(): string {
         }
         state.recipients = (data.items || []).map((item) => item.email);
         recipientInput.value = "";
+        subscriptionRecipientGroupSelect.value = "";
         renderRecipients();
         updateComposerStatus();
       } catch (error) {
@@ -1431,6 +1566,7 @@ export function buildNewsletterAppHtml(): string {
               throw new Error(data.error || "이메일 삭제에 실패했습니다.");
             }
             state.recipients = (data.items || []).map((item) => item.email);
+            subscriptionRecipientGroupSelect.value = "";
             renderRecipients();
             updateComposerStatus();
           } catch (error) {
@@ -1441,6 +1577,8 @@ export function buildNewsletterAppHtml(): string {
     }
 
     function renderRecipientGroups() {
+      renderRecipientGroupOptions();
+
       if (!state.recipientGroups.length) {
         savedRecipientGroupList.innerHTML = '<span class="subtle">저장된 수신자 그룹이 없습니다.</span>';
         return;
@@ -1477,6 +1615,26 @@ export function buildNewsletterAppHtml(): string {
           await deleteRecipientGroup(button.dataset.deleteGroup);
         });
       });
+    }
+
+    function renderRecipientGroupOptions() {
+      const currentValue = subscriptionRecipientGroupSelect.value;
+      const options = ['<option value="">현재 수신자 목록 스냅샷 사용</option>'].concat(
+        state.recipientGroups.map((group) =>
+          '<option value="' + escapeHtml(group.id) + '">' + escapeHtml(group.name) + '</option>'
+        ),
+      );
+      subscriptionRecipientGroupSelect.innerHTML = options.join("");
+      const exists = state.recipientGroups.some((group) => group.id === currentValue);
+      subscriptionRecipientGroupSelect.value = exists ? currentValue : "";
+    }
+
+    function getSelectedRecipientGroup() {
+      if (!subscriptionRecipientGroupSelect.value) {
+        return null;
+      }
+
+      return state.recipientGroups.find((group) => group.id === subscriptionRecipientGroupSelect.value) || null;
     }
 
     function getRecipientGroupSummary(group) {
@@ -1535,6 +1693,11 @@ export function buildNewsletterAppHtml(): string {
 
       try {
         await syncRecipients(nextRecipients);
+        if (mode === "replace") {
+          subscriptionRecipientGroupSelect.value = group.id;
+        } else {
+          subscriptionRecipientGroupSelect.value = "";
+        }
         setStatus(
           composerStatus,
           mode === "append"
@@ -1581,6 +1744,9 @@ export function buildNewsletterAppHtml(): string {
           ? '<div class="saved-preset-actions" style="justify-content: flex-start;">' +
               '<button type="button" class="ghost-btn" data-open-log-html="' + escapeHtml(log.jobId) + '">HTML 보기</button>' +
               '<button type="button" class="ghost-btn" data-download-log-markdown="' + escapeHtml(log.jobId) + '">Markdown 저장</button>' +
+              (log.status === "failed"
+                ? '<button type="button" class="ghost-btn" data-retry-failed-log="' + escapeHtml(log.id) + '">이 수신자 재시도</button>'
+                : '') +
               '<button type="button" class="ghost-btn" data-resend-log="' + escapeHtml(log.jobId) + '">현재 수신자에게 재전송</button>' +
             '</div>'
           : '<div class="log-meta">발송 스냅샷이 없습니다.</div>';
@@ -1602,6 +1768,12 @@ export function buildNewsletterAppHtml(): string {
       sendLogList.querySelectorAll("button[data-download-log-markdown]").forEach((button) => {
         button.addEventListener("click", async () => {
           await downloadSendLogMarkdown(button.dataset.downloadLogMarkdown);
+        });
+      });
+
+      sendLogList.querySelectorAll("button[data-retry-failed-log]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await retryFailedSendLog(button.dataset.retryFailedLog);
         });
       });
 
@@ -1628,11 +1800,34 @@ export function buildNewsletterAppHtml(): string {
             (job.lastRunMessage ? ' · ' + escapeHtml(job.lastRunMessage) : '') +
             '</div>'
           : '';
-        const cancelButton = (job.status === "pending" || job.status === "failed")
-          ? '<button type="button" class="danger-btn" data-cancel-schedule="' + escapeHtml(job.id) + '">예약 취소</button>'
-          : '';
+        const actionButtons = [];
+        actionButtons.push(
+          '<button type="button" class="ghost-btn" data-show-schedule-history="' + escapeHtml(job.id) + '">' +
+            escapeHtml(state.scheduleRunFilterJobId === job.id ? "이력 보는 중" : "이력 보기") +
+          '</button>',
+        );
+        if (job.status === "pending") {
+          actionButtons.push(
+            '<button type="button" class="ghost-btn" data-pause-schedule="' + escapeHtml(job.id) + '">일시정지</button>',
+          );
+        }
+        if (job.status === "paused" || job.status === "failed") {
+          actionButtons.push(
+            '<button type="button" class="ghost-btn" data-resume-schedule="' + escapeHtml(job.id) + '">' +
+              escapeHtml(job.status === "failed" ? "다시 대기" : "재개") +
+            '</button>',
+          );
+        }
+        if (job.status === "pending" || job.status === "paused" || job.status === "failed") {
+          actionButtons.push(
+            '<button type="button" class="danger-btn" data-cancel-schedule="' + escapeHtml(job.id) + '">예약 취소</button>',
+          );
+        }
         const presetMeta = job.payload.searchPresetName
           ? ' · 기준 preset ' + escapeHtml(job.payload.searchPresetName)
+          : '';
+        const recipientGroupMeta = job.payload.recipientGroupName
+          ? ' · 수신자 그룹 ' + escapeHtml(job.payload.recipientGroupName)
           : '';
         const newOnlyMeta = job.payload.onlyNewResults
           ? ' · 새 법안만'
@@ -1642,19 +1837,121 @@ export function buildNewsletterAppHtml(): string {
           '<div class="log-meta">예약 시각 ' + escapeHtml(formatScheduledAt(job.scheduledAt)) +
           ' · 반복 ' + escapeHtml(getScheduleRecurrenceLabel(job.recurrence)) +
           presetMeta +
+          recipientGroupMeta +
           newOnlyMeta +
           ' · 수신자 ' + escapeHtml(String((job.payload.recipients || []).length)) + '명' +
           ' · 대상 ' + escapeHtml(getScheduledJobTargetLabel(job)) + '</div>' +
           '<div class="log-status ' + escapeHtml(job.status) + '">' + escapeHtml(status) + '</div>' +
           lastProcessed +
           lastResult +
-          (cancelButton ? '<div class="saved-preset-actions" style="justify-content: flex-start;">' + cancelButton + '</div>' : '') +
+          (actionButtons.length
+            ? '<div class="saved-preset-actions" style="justify-content: flex-start;">' + actionButtons.join("") + '</div>'
+            : '') +
           '</div>';
       }).join("");
+
+      scheduleList.querySelectorAll("button[data-pause-schedule]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await pauseScheduledJob(button.dataset.pauseSchedule);
+        });
+      });
+
+      scheduleList.querySelectorAll("button[data-show-schedule-history]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await setScheduleRunFilter(button.dataset.showScheduleHistory || "");
+        });
+      });
+
+      scheduleList.querySelectorAll("button[data-resume-schedule]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await resumeScheduledJob(button.dataset.resumeSchedule);
+        });
+      });
 
       scheduleList.querySelectorAll("button[data-cancel-schedule]").forEach((button) => {
         button.addEventListener("click", async () => {
           await cancelScheduledJob(button.dataset.cancelSchedule);
+        });
+      });
+    }
+
+    function renderScheduleRuns() {
+      renderScheduleRunFilterBar();
+
+      if (!state.scheduleRunLogs.length) {
+        scheduleRunList.innerHTML = '<span class="subtle">' +
+          escapeHtml(
+            state.scheduleRunFilterJobId
+              ? "선택한 예약의 실행 이력이 아직 없습니다."
+              : "아직 예약 실행 이력이 없습니다.",
+          ) +
+        '</span>';
+        return;
+      }
+
+      scheduleRunList.innerHTML = state.scheduleRunLogs.map((run) => {
+        const statusLabel = getScheduleRunResultLabel(run.status);
+        const statusTone = run.status === "failed"
+          ? "failed"
+          : (run.status === "skipped" ? "skipped" : "sent");
+        const recipientResult = run.status === "sent"
+          ? '발송 성공 ' + escapeHtml(String(run.sentCount || 0)) + '건 / 실패 ' + escapeHtml(String(run.failedCount || 0)) + '건'
+          : '발송 성공 0건 / 실패 0건';
+        const detail = run.message
+          ? '<div class="log-meta">' + escapeHtml(run.message) + '</div>'
+          : '';
+        const snapshotActions = run.deliveryJobId
+          ? '<div class="saved-preset-actions" style="justify-content: flex-start;">' +
+              '<button type="button" class="ghost-btn" data-open-schedule-run-html="' + escapeHtml(run.deliveryJobId) + '">HTML 보기</button>' +
+              '<button type="button" class="ghost-btn" data-download-schedule-run-markdown="' + escapeHtml(run.deliveryJobId) + '">Markdown 저장</button>' +
+            '</div>'
+          : '';
+
+        return '<div class="log-item">' +
+          '<strong>' + escapeHtml(run.scheduleSubject || "입법예고 뉴스레터") + '</strong>' +
+          '<div class="log-meta">실행 ' + escapeHtml(run.runAt || "") +
+            ' · 반복 ' + escapeHtml(getScheduleRecurrenceLabel(run.recurrence)) +
+            (run.keyword ? ' · 키워드 ' + escapeHtml(run.keyword) : '') +
+            ' · 법안 ' + escapeHtml(String(run.itemCount || 0)) + '건' +
+            ' · ' + recipientResult + '</div>' +
+          '<div class="log-status ' + escapeHtml(statusTone) + '">' + escapeHtml(statusLabel) + '</div>' +
+          detail +
+          snapshotActions +
+          '</div>';
+      }).join("");
+
+      scheduleRunList.querySelectorAll("button[data-open-schedule-run-html]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await openSendLogHtml(button.dataset.openScheduleRunHtml);
+        });
+      });
+
+      scheduleRunList.querySelectorAll("button[data-download-schedule-run-markdown]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await downloadSendLogMarkdown(button.dataset.downloadScheduleRunMarkdown);
+        });
+      });
+    }
+
+    function renderScheduleRunFilterBar() {
+      if (!state.scheduleRunFilterJobId) {
+        scheduleRunFilterBar.hidden = true;
+        scheduleRunFilterBar.innerHTML = "";
+        return;
+      }
+
+      const job = state.scheduleJobs.find((item) => item.id === state.scheduleRunFilterJobId);
+      const label = job
+        ? (job.payload.subject || "입법예고 뉴스레터")
+        : "선택한 예약";
+      scheduleRunFilterBar.hidden = false;
+      scheduleRunFilterBar.innerHTML =
+        '<span class="subtle">현재 "' + escapeHtml(label) + '" 예약 이력만 보는 중입니다.</span>' +
+        '<button type="button" class="ghost-btn" data-clear-schedule-run-filter="true">전체 이력 보기</button>';
+
+      scheduleRunFilterBar.querySelectorAll("button[data-clear-schedule-run-filter]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await clearScheduleRunFilter();
         });
       });
     }
@@ -1678,6 +1975,7 @@ export function buildNewsletterAppHtml(): string {
     function getScheduleStatusLabel(status) {
       if (status === "pending") return "예약 대기";
       if (status === "processing") return "발송 중";
+      if (status === "paused") return "일시정지";
       if (status === "sent") return "발송 완료";
       if (status === "skipped") return "건너뜀";
       if (status === "failed") return "발송 실패";
@@ -1809,6 +2107,33 @@ export function buildNewsletterAppHtml(): string {
       }
     }
 
+    async function retryFailedSendLog(logId) {
+      try {
+        if (!logId) {
+          throw new Error("재시도할 발송 로그 id가 없습니다.");
+        }
+
+        const response = await fetch("/api/newsletter/send-log-retry-failed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ logId }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "실패 수신자 재시도에 실패했습니다.");
+        }
+
+        setStatus(
+          composerStatus,
+          "실패 수신자 재시도 완료 · 성공 " + data.sent + "건 / 실패 " + data.failed + "건",
+          data.failed === 0 ? "success" : "error",
+        );
+        await loadSendLogs();
+      } catch (error) {
+        setStatus(composerStatus, error.message || "실패 수신자 재시도에 실패했습니다.", "error");
+      }
+    }
+
     async function sendNewsletter(includeAll) {
       try {
         if (!includeAll && state.selectedBillIds.size === 0) {
@@ -1907,23 +2232,56 @@ export function buildNewsletterAppHtml(): string {
       }
     }
 
-    function buildNewsletterPayload(options) {
+    function buildQuerySourceFromState() {
+      return {
+        keyword: state.query.keyword || null,
+        datePreset: state.query.datePreset,
+        dateFrom: state.query.dateFrom || null,
+        dateTo: state.query.dateTo || null,
+        noticeScope: state.query.noticeScope,
+        sortBy: state.query.sortBy,
+        pageSize: state.query.pageSize,
+      };
+    }
+
+    function buildNewsletterPayloadFromSource(querySource, options) {
       const includeAll = Boolean(options && options.includeAll);
       const useCurrentPageItems = Boolean(options && options.useCurrentPageItems);
       const schedulePreset = options && options.schedulePreset ? options.schedulePreset : null;
       const onlyNewResults = Boolean(options && options.onlyNewResults);
-      const querySource = schedulePreset
-        ? buildSearchQueryFromPreset(schedulePreset)
-        : {
-            keyword: state.query.keyword || null,
-            datePreset: state.query.datePreset,
-            dateFrom: state.query.dateFrom || null,
-            dateTo: state.query.dateTo || null,
-            noticeScope: state.query.noticeScope,
-            sortBy: state.query.sortBy,
-            pageSize: state.query.pageSize,
-          };
+      const recipients = options && Array.isArray(options.recipients)
+        ? options.recipients
+        : state.recipients;
+      const subject = options && typeof options.subject === "string"
+        ? options.subject
+        : subjectInput.value.trim();
+      const introText = options && typeof options.introText === "string"
+        ? options.introText
+        : introInput.value.trim();
+      const outroText = options && typeof options.outroText === "string"
+        ? options.outroText
+        : outroInput.value.trim();
+      const searchPresetId = schedulePreset
+        ? schedulePreset.id
+        : (options && typeof options.searchPresetId === "string" ? options.searchPresetId : null);
+      const searchPresetName = schedulePreset
+        ? schedulePreset.name
+        : (options && typeof options.searchPresetName === "string" ? options.searchPresetName : null);
+      const selectedRecipientGroup = getSelectedRecipientGroup();
+      const hasRecipientGroupId = Boolean(
+        options && Object.prototype.hasOwnProperty.call(options, "recipientGroupId"),
+      );
+      const hasRecipientGroupName = Boolean(
+        options && Object.prototype.hasOwnProperty.call(options, "recipientGroupName"),
+      );
+      const recipientGroupId = hasRecipientGroupId
+        ? (options.recipientGroupId || null)
+        : (selectedRecipientGroup ? selectedRecipientGroup.id : null);
+      const recipientGroupName = hasRecipientGroupName
+        ? (options.recipientGroupName || null)
+        : (selectedRecipientGroup ? selectedRecipientGroup.name : null);
       const selectedIds = Array.from(state.selectedBillIds);
+
       return {
         query: {
           keyword: querySource.keyword || undefined,
@@ -1934,23 +2292,34 @@ export function buildNewsletterAppHtml(): string {
           sortBy: querySource.sortBy,
           page: includeAll ? 1 : state.query.page,
           pageSize: includeAll
-            ? (schedulePreset ? querySource.pageSize : Math.max(state.total, state.query.pageSize))
+            ? (schedulePreset ? querySource.pageSize : Math.max(state.total, querySource.pageSize || DEFAULT_PAGE_SIZE))
             : querySource.pageSize,
         },
         items: includeAll
           ? []
           : (useCurrentPageItems ? state.items : Array.from(state.itemCache.values())),
         selectedBillIds: includeAll ? [] : selectedIds,
-        recipients: state.recipients,
-        subject: subjectInput.value.trim(),
-        introText: introInput.value.trim(),
-        outroText: outroInput.value.trim(),
+        recipients,
+        subject,
+        introText,
+        outroText,
         includeAllResults: includeAll,
         onlyNewResults,
         excludeBillIds: [],
-        searchPresetId: schedulePreset ? schedulePreset.id : null,
-        searchPresetName: schedulePreset ? schedulePreset.name : null,
+        recipientGroupId,
+        recipientGroupName,
+        searchPresetId,
+        searchPresetName,
       };
+    }
+
+    function buildNewsletterPayload(options) {
+      const schedulePreset = options && options.schedulePreset ? options.schedulePreset : null;
+      const querySource = schedulePreset
+        ? buildSearchQueryFromPreset(schedulePreset)
+        : buildQuerySourceFromState();
+
+      return buildNewsletterPayloadFromSource(querySource, options);
     }
 
     function buildSavedSearchPresetPayload() {
@@ -1963,6 +2332,27 @@ export function buildNewsletterAppHtml(): string {
         noticeScope: state.query.noticeScope,
         sortBy: state.query.sortBy,
         pageSize: state.query.pageSize,
+      };
+    }
+
+    function buildSubscriptionTemplatePayload() {
+      const recipientGroup = getSelectedRecipientGroup();
+      const linkedPreset = schedulePresetSelect.value
+        ? state.searchPresets.find((item) => item.id === schedulePresetSelect.value) || null
+        : null;
+
+      return {
+        query: buildSavedSearchPresetPayload(),
+        recipientGroupId: recipientGroup ? recipientGroup.id : null,
+        recipientGroupName: recipientGroup ? recipientGroup.name : null,
+        searchPresetId: linkedPreset ? linkedPreset.id : null,
+        searchPresetName: linkedPreset ? linkedPreset.name : null,
+        recipients: state.recipients,
+        subject: subjectInput.value.trim(),
+        introText: introInput.value.trim(),
+        outroText: outroInput.value.trim(),
+        recurrence: scheduleRecurrenceSelect.value,
+        onlyNewResults: scheduleOnlyNewInput.checked,
       };
     }
 
@@ -2000,6 +2390,47 @@ export function buildNewsletterAppHtml(): string {
       }
     }
 
+    async function saveSubscriptionTemplate() {
+      syncQueryFromInputs();
+
+      if (!subscriptionNameInput.value.trim()) {
+        setStatus(composerStatus, "저장할 구독 템플릿 이름을 입력해 주세요.", "error");
+        return;
+      }
+
+      if (!state.recipients.length) {
+        setStatus(composerStatus, "구독 템플릿에 포함할 수신자 이메일을 먼저 1개 이상 추가해 주세요.", "error");
+        return;
+      }
+
+      if (state.query.datePreset === "custom" && (!state.query.dateFrom || !state.query.dateTo)) {
+        setStatus(composerStatus, "직접 지정 기간 구독 템플릿은 시작일과 종료일을 모두 입력해야 합니다.", "error");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/newsletter-subscriptions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: subscriptionNameInput.value.trim(),
+            ...buildSubscriptionTemplatePayload(),
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "구독 템플릿 저장에 실패했습니다.");
+        }
+
+        state.subscriptionTemplates = data.items || [];
+        renderSubscriptionTemplates();
+        subscriptionNameInput.value = "";
+        setStatus(composerStatus, "구독 템플릿을 저장했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "구독 템플릿 저장에 실패했습니다.", "error");
+      }
+    }
+
     async function deleteSearchPreset(id) {
       if (!id) return;
 
@@ -2021,24 +2452,10 @@ export function buildNewsletterAppHtml(): string {
 
     function applySavedSearchPreset(preset) {
       presetNameInput.value = preset.name;
-      schedulePresetSelect.value = preset.id;
-      keywordInput.value = preset.query.keyword || "";
-      noticeScopeSelect.value = preset.query.noticeScope;
-      sortBySelect.value = preset.query.sortBy;
-      pageSizeSelect.value = String(preset.query.pageSize || DEFAULT_PAGE_SIZE);
-
-      if (preset.query.datePreset === "custom") {
-        applyPreset("custom");
-        dateFromInput.value = preset.query.dateFrom || "";
-        dateToInput.value = preset.query.dateTo || "";
-        state.query.dateFrom = preset.query.dateFrom || "";
-        state.query.dateTo = preset.query.dateTo || "";
-      } else {
-        applyPreset(preset.query.datePreset);
-      }
-
-      startNewSearch();
-      setStatus(searchStatus, "저장된 검색 preset을 불러왔습니다.", "success");
+      applyQuerySnapshot(preset.query, {
+        linkedPresetId: preset.id,
+        statusMessage: "저장된 검색 preset을 불러왔습니다.",
+      });
     }
 
     function buildSearchQueryFromPreset(preset) {
@@ -2051,6 +2468,154 @@ export function buildNewsletterAppHtml(): string {
         sortBy: preset.query.sortBy,
         pageSize: preset.query.pageSize || DEFAULT_PAGE_SIZE,
       };
+    }
+
+    function resolveSubscriptionQuerySource(subscription) {
+      const linkedPreset = subscription.searchPresetId
+        ? state.searchPresets.find((item) => item.id === subscription.searchPresetId) || null
+        : null;
+      const linkedRecipientGroup = subscription.recipientGroupId
+        ? state.recipientGroups.find((item) => item.id === subscription.recipientGroupId) || null
+        : null;
+
+      return {
+        linkedRecipientGroup,
+        linkedPreset,
+        querySource: linkedPreset ? buildSearchQueryFromPreset(linkedPreset) : {
+          keyword: subscription.query.keyword || null,
+          datePreset: subscription.query.datePreset,
+          dateFrom: subscription.query.dateFrom || null,
+          dateTo: subscription.query.dateTo || null,
+          noticeScope: subscription.query.noticeScope,
+          sortBy: subscription.query.sortBy,
+          pageSize: subscription.query.pageSize || DEFAULT_PAGE_SIZE,
+        },
+      };
+    }
+
+    async function loadSubscriptionTemplate(id) {
+      if (!id) return;
+
+      const subscription = state.subscriptionTemplates.find((item) => item.id === id);
+      if (!subscription) {
+        setStatus(composerStatus, "선택한 구독 템플릿을 찾지 못했습니다.", "error");
+        return;
+      }
+
+      const resolved = resolveSubscriptionQuerySource(subscription);
+      subscriptionNameInput.value = subscription.name;
+      subjectInput.value = subscription.subject || "";
+      introInput.value = subscription.introText || "";
+      outroInput.value = subscription.outroText || "";
+      scheduleRecurrenceSelect.value = subscription.recurrence || "once";
+      scheduleOnlyNewInput.checked = subscription.onlyNewResults === true;
+      subscriptionRecipientGroupSelect.value = resolved.linkedRecipientGroup ? resolved.linkedRecipientGroup.id : "";
+      if (resolved.linkedPreset) {
+        presetNameInput.value = resolved.linkedPreset.name;
+      }
+
+      applyQuerySnapshot(resolved.linkedPreset ? resolved.linkedPreset.query : subscription.query, {
+        linkedPresetId: resolved.linkedPreset ? resolved.linkedPreset.id : "",
+        statusMessage: '구독 템플릿 "' + subscription.name + '"을 불러왔습니다.',
+      });
+
+      try {
+        await syncRecipients(
+          resolved.linkedRecipientGroup
+            ? (resolved.linkedRecipientGroup.emails || [])
+            : (subscription.recipients || []),
+        );
+        setStatus(composerStatus, '구독 템플릿 "' + subscription.name + '"을 불러왔습니다.', "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "구독 템플릿 수신자 불러오기에 실패했습니다.", "error");
+      }
+    }
+
+    function buildNewsletterPayloadFromSubscription(subscription) {
+      const resolved = resolveSubscriptionQuerySource(subscription);
+
+      return buildNewsletterPayloadFromSource(resolved.querySource, {
+        includeAll: true,
+        schedulePreset: resolved.linkedPreset,
+        recipients: resolved.linkedRecipientGroup
+          ? (resolved.linkedRecipientGroup.emails || [])
+          : (subscription.recipients || []),
+        subject: subscription.subject || "",
+        introText: subscription.introText || "",
+        outroText: subscription.outroText || "",
+        onlyNewResults: subscription.onlyNewResults === true,
+        recipientGroupId: resolved.linkedRecipientGroup
+          ? resolved.linkedRecipientGroup.id
+          : (subscription.recipientGroupId || null),
+        recipientGroupName: resolved.linkedRecipientGroup
+          ? resolved.linkedRecipientGroup.name
+          : (subscription.recipientGroupName || null),
+        searchPresetId: resolved.linkedPreset ? resolved.linkedPreset.id : (subscription.searchPresetId || null),
+        searchPresetName: resolved.linkedPreset ? resolved.linkedPreset.name : (subscription.searchPresetName || null),
+      });
+    }
+
+    async function scheduleSubscriptionTemplate(id) {
+      if (!id) return;
+      if (!scheduleAtInput.value) {
+        setStatus(composerStatus, "예약 발송 시각을 입력해 주세요.", "error");
+        return;
+      }
+
+      const subscription = state.subscriptionTemplates.find((item) => item.id === id);
+      if (!subscription) {
+        setStatus(composerStatus, "선택한 구독 템플릿을 찾지 못했습니다.", "error");
+        return;
+      }
+
+      try {
+        const resolved = resolveSubscriptionQuerySource(subscription);
+        const response = await fetch("/api/newsletter/schedules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scheduledAt: scheduleAtInput.value,
+            recurrence: subscription.recurrence || "once",
+            payload: buildNewsletterPayloadFromSubscription(subscription),
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "구독 템플릿 예약 등록에 실패했습니다.");
+        }
+
+        state.scheduleJobs = data.items || [];
+        renderScheduleJobs();
+        scheduleAtInput.value = getDefaultScheduleAtValue();
+        setStatus(
+          composerStatus,
+          buildScheduleRegisteredMessage(resolved.linkedPreset, subscription.onlyNewResults) +
+            ' 구독 템플릿 "' + subscription.name + '"을 사용했습니다.',
+          "success",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "구독 템플릿 예약 등록에 실패했습니다.", "error");
+      }
+    }
+
+    async function deleteSubscriptionTemplate(id) {
+      if (!id) return;
+
+      try {
+        const response = await fetch("/api/newsletter-subscriptions?id=" + encodeURIComponent(id), {
+          method: "DELETE",
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "구독 템플릿 삭제에 실패했습니다.");
+        }
+
+        state.subscriptionTemplates = data.items || [];
+        renderSubscriptionTemplates();
+        setStatus(composerStatus, "구독 템플릿을 삭제했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "구독 템플릿 삭제에 실패했습니다.", "error");
+      }
     }
 
     function buildScheduleRegisteredMessage(schedulePreset, onlyNewResults) {
@@ -2120,6 +2685,20 @@ export function buildNewsletterAppHtml(): string {
       }
     }
 
+    async function loadSubscriptionTemplates() {
+      try {
+        const response = await fetch("/api/newsletter-subscriptions");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "구독 템플릿 목록을 불러오지 못했습니다.");
+        }
+        state.subscriptionTemplates = data.items || [];
+        renderSubscriptionTemplates();
+      } catch (error) {
+        savedSubscriptionList.innerHTML = '<span class="subtle">' + escapeHtml(error.message || "구독 템플릿 목록을 불러오지 못했습니다.") + '</span>';
+      }
+    }
+
     async function loadSchedules() {
       try {
         const response = await fetch("/api/newsletter/schedules?limit=8");
@@ -2146,13 +2725,61 @@ export function buildNewsletterAppHtml(): string {
           throw new Error(data.error || "예약 발송 취소에 실패했습니다.");
         }
         if (!data.cancelled) {
-          throw new Error("대기 중인 예약만 취소할 수 있습니다.");
+          throw new Error("대기 중이거나 일시정지된 예약만 취소할 수 있습니다.");
         }
         state.scheduleJobs = data.items || [];
         renderScheduleJobs();
         setStatus(composerStatus, "예약 발송을 취소했습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "예약 발송 취소에 실패했습니다.", "error");
+      }
+    }
+
+    async function pauseScheduledJob(id) {
+      if (!id) return;
+
+      try {
+        const response = await fetch("/api/newsletter/schedules/pause", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "예약 발송 일시정지에 실패했습니다.");
+        }
+        if (!data.paused) {
+          throw new Error("대기 중인 예약만 일시정지할 수 있습니다.");
+        }
+        state.scheduleJobs = data.items || [];
+        renderScheduleJobs();
+        setStatus(composerStatus, "예약 발송을 일시정지했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "예약 발송 일시정지에 실패했습니다.", "error");
+      }
+    }
+
+    async function resumeScheduledJob(id) {
+      if (!id) return;
+
+      try {
+        const response = await fetch("/api/newsletter/schedules/resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "예약 발송 재개에 실패했습니다.");
+        }
+        if (!data.resumed) {
+          throw new Error("일시정지 또는 실패 상태의 예약만 다시 대기할 수 있습니다.");
+        }
+        state.scheduleJobs = data.items || [];
+        renderScheduleJobs();
+        setStatus(composerStatus, "예약 발송을 다시 대기 상태로 돌렸습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "예약 발송 재개에 실패했습니다.", "error");
       }
     }
 

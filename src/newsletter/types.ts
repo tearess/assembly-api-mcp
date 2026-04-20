@@ -79,6 +79,8 @@ export interface NewsletterContentPayload {
   readonly includeAllResults: boolean;
   readonly onlyNewResults?: boolean | null;
   readonly excludeBillIds?: readonly string[] | null;
+  readonly recipientGroupId?: string | null;
+  readonly recipientGroupName?: string | null;
   readonly searchPresetId?: string | null;
   readonly searchPresetName?: string | null;
 }
@@ -143,6 +145,7 @@ export interface SavedSearchPresetRecord {
 export type ScheduledNewsletterJobStatus =
   | "pending"
   | "processing"
+  | "paused"
   | "sent"
   | "skipped"
   | "failed"
@@ -150,6 +153,39 @@ export type ScheduledNewsletterJobStatus =
 
 export type ScheduledNewsletterRecurrence = "once" | "daily" | "weekly";
 export type ScheduledNewsletterJobRunStatus = "sent" | "failed" | "skipped";
+
+export interface ScheduledNewsletterRunRecord {
+  readonly id: string;
+  readonly scheduleJobId: string;
+  readonly scheduleSubject: string;
+  readonly recurrence: ScheduledNewsletterRecurrence;
+  readonly status: ScheduledNewsletterJobRunStatus;
+  readonly message: string | null;
+  readonly keyword: string | null;
+  readonly itemCount: number;
+  readonly sentCount: number;
+  readonly failedCount: number;
+  readonly deliveryJobId: string | null;
+  readonly runAt: string;
+}
+
+export interface SavedNewsletterSubscriptionRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly query: SavedSearchPresetQuery;
+  readonly recipientGroupId: string | null;
+  readonly recipientGroupName: string | null;
+  readonly searchPresetId: string | null;
+  readonly searchPresetName: string | null;
+  readonly recipients: readonly string[];
+  readonly subject: string | null;
+  readonly introText?: string | null;
+  readonly outroText?: string | null;
+  readonly recurrence: ScheduledNewsletterRecurrence;
+  readonly onlyNewResults: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
 
 export interface ScheduledNewsletterJobRecord {
   readonly id: string;

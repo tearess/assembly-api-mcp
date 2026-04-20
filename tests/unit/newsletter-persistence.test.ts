@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  NewsletterSubscriptionStore,
   RecipientGroupStore,
   RecipientStore,
   SearchPresetStore,
@@ -189,6 +190,8 @@ describe("newsletter/persistence", () => {
       expect(failed?.errorMessage).toBe("SMTP timeout");
       expect(saved.every((item) => item.jobId === "job-1")).toBe(true);
       expect(saved.every((item) => item.snapshotAvailable === true)).toBe(true);
+      const fetched = await store.get(saved[0]!.id);
+      expect(fetched?.id).toBe(saved[0]!.id);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -280,6 +283,118 @@ describe("newsletter/persistence", () => {
       });
 
       const deleted = await store.delete(preset.id);
+      expect(deleted).toBe(true);
+      expect(await store.list()).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("구독 템플릿을 저장하고 같은 이름이면 갱신한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new NewsletterSubscriptionStore(dir);
+      const first = await store.upsert("AI 정책 브리핑", {
+        query: {
+          keyword: "인공지능",
+          datePreset: "1m",
+          dateFrom: null,
+          dateTo: null,
+          noticeScope: "include_closed",
+          sortBy: "relevance",
+          pageSize: 20,
+        },
+        recipientGroupId: "group-1",
+        recipientGroupName: "정책팀 전체",
+        searchPresetId: null,
+        searchPresetName: null,
+        recipients: ["alpha@example.com", "beta@example.com"],
+        subject: "[입법예고 뉴스레터] AI 정책 브리핑",
+        introText: "브리핑 메모",
+        outroText: "마무리 문구",
+        recurrence: "weekly",
+        onlyNewResults: true,
+      });
+
+      const updated = await store.upsert("ai 정책 브리핑", {
+        query: {
+          keyword: "AI",
+          datePreset: "custom",
+          dateFrom: "2026-04-01",
+          dateTo: "2026-04-20",
+          noticeScope: "active_only",
+          sortBy: "notice_end_desc",
+          pageSize: 50,
+        },
+        recipientGroupId: null,
+        recipientGroupName: null,
+        searchPresetId: "preset-1",
+        searchPresetName: "AI 최근 1개월",
+        recipients: ["gamma@example.com"],
+        subject: null,
+        introText: null,
+        outroText: null,
+        recurrence: "daily",
+        onlyNewResults: false,
+      });
+
+      expect(updated.id).toBe(first.id);
+      const items = await store.list();
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        id: first.id,
+        name: "ai 정책 브리핑",
+        query: {
+          keyword: "AI",
+          datePreset: "custom",
+          dateFrom: "2026-04-01",
+          dateTo: "2026-04-20",
+          noticeScope: "active_only",
+          sortBy: "notice_end_desc",
+          pageSize: 50,
+        },
+        recipientGroupId: null,
+        recipientGroupName: null,
+        searchPresetId: "preset-1",
+        searchPresetName: "AI 최근 1개월",
+        recipients: ["gamma@example.com"],
+        recurrence: "daily",
+        onlyNewResults: false,
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("구독 템플릿을 삭제할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new NewsletterSubscriptionStore(dir);
+      const subscription = await store.upsert("보건의료 모니터링", {
+        query: {
+          keyword: "보건의료",
+          datePreset: "3m",
+          dateFrom: null,
+          dateTo: null,
+          noticeScope: "include_closed",
+          sortBy: "relevance",
+          pageSize: 20,
+        },
+        recipientGroupId: null,
+        recipientGroupName: null,
+        searchPresetId: null,
+        searchPresetName: null,
+        recipients: ["alpha@example.com"],
+        subject: null,
+        introText: null,
+        outroText: null,
+        recurrence: "once",
+        onlyNewResults: false,
+      });
+
+      const deleted = await store.delete(subscription.id);
       expect(deleted).toBe(true);
       expect(await store.list()).toEqual([]);
     } finally {
@@ -403,6 +518,77 @@ describe("newsletter/persistence", () => {
     }
   });
 
+  it("대기 중인 예약은 일시정지하면 claim 대상에서 제외된다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00", "daily");
+
+      const paused = await store.pause(job.id);
+      expect(paused).toBe(true);
+
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        status: "paused",
+      });
+
+      const claimed = await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      expect(claimed).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("일시정지한 예약은 재개하면 다시 claim할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00", "daily");
+
+      await store.pause(job.id);
+      const resumed = await store.resume(job.id);
+      expect(resumed).toBe(true);
+
+      const claimed = await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      expect(claimed).toHaveLength(1);
+      expect(claimed[0]).toMatchObject({
+        id: job.id,
+        status: "processing",
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("실패한 예약은 다시 대기 상태로 되돌릴 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00", "daily");
+
+      await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      await store.markFailed(job.id, "SMTP 인증 실패");
+
+      const resumed = await store.resume(job.id);
+      expect(resumed).toBe(true);
+
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        status: "pending",
+        lastRunStatus: "failed",
+        lastRunMessage: "SMTP 인증 실패",
+        errorMessage: null,
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("단일 예약 발송은 결과가 없으면 건너뜀 상태로 마감한다", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
 
@@ -432,6 +618,27 @@ describe("newsletter/persistence", () => {
       const store = new ScheduledNewsletterJobStore(dir);
       const job = await store.create(createSendPayload(), "2099-01-02T09:00");
 
+      const cancelled = await store.cancel(job.id);
+      expect(cancelled).toBe(true);
+
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        status: "cancelled",
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("일시정지한 예약도 취소할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-02T09:00", "daily");
+
+      await store.pause(job.id);
       const cancelled = await store.cancel(job.id);
       expect(cancelled).toBe(true);
 

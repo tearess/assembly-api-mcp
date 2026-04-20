@@ -7,9 +7,10 @@ import {
   EMPTY_NEWSLETTER_ERROR_MESSAGE,
   resendNewsletterFromSnapshot,
   resolveNewsletterContentPayload,
+  resolveNewsletterSendPayload,
   sendPreparedNewsletter,
 } from "../../src/newsletter/delivery.js";
-import { SearchPresetStore } from "../../src/newsletter/persistence.js";
+import { RecipientGroupStore, SearchPresetStore } from "../../src/newsletter/persistence.js";
 import {
   type NewsletterContentPayload,
   type NewsletterDocument,
@@ -126,6 +127,38 @@ describe("newsletter/delivery", () => {
       searchPresetId: "missing-preset-id",
       searchPresetName: "삭제된 preset",
     });
+  });
+
+  it("recipient group id가 있으면 최신 저장 그룹 기준으로 수신자를 다시 맞춘다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const groupStore = new RecipientGroupStore(dir);
+      const group = await groupStore.upsert("정책팀 전체", [
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+
+      const resolved = await resolveNewsletterSendPayload(
+        {
+          ...createPayload(),
+          recipientGroupId: group.id,
+          recipientGroupName: "예전 그룹 이름",
+          recipients: ["old@example.com"],
+        },
+        { get: async () => null },
+        groupStore,
+      );
+
+      expect(resolved.recipientGroupId).toBe(group.id);
+      expect(resolved.recipientGroupName).toBe("정책팀 전체");
+      expect(resolved.recipients).toEqual([
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("exclude bill id가 있으면 문서 생성 전에 해당 법안을 제외한다", async () => {

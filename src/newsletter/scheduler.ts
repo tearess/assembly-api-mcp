@@ -1,5 +1,8 @@
 import { type AppConfig } from "../config.js";
-import { ScheduledNewsletterJobStore } from "./persistence.js";
+import {
+  ScheduledNewsletterJobStore,
+  ScheduledNewsletterRunStore,
+} from "./persistence.js";
 import { isEmptyNewsletterError, sendNewsletterFromPayload } from "./delivery.js";
 import { type NewsletterSendExecution } from "./delivery.js";
 import { type NewsletterSendPayload } from "./types.js";
@@ -18,6 +21,7 @@ export class NewsletterScheduleProcessor {
       payload: NewsletterSendPayload,
       config: AppConfig,
     ) => Promise<NewsletterSendExecution> = sendNewsletterFromPayload,
+    private readonly runStore: Pick<ScheduledNewsletterRunStore, "append"> = new ScheduledNewsletterRunStore(),
   ) {}
 
   async start(): Promise<void> {
@@ -69,6 +73,20 @@ export class NewsletterScheduleProcessor {
             new Date(),
             execution.document.items.map((item) => item.billId),
           );
+          await this.appendRunLog({
+            scheduleJobId: job.id,
+            scheduleSubject: execution.document.subject,
+            recurrence: job.recurrence,
+            status: "sent",
+            message: execution.result.failed > 0
+              ? `일부 수신 실패 ${String(execution.result.failed)}건`
+              : null,
+            keyword: execution.document.keyword,
+            itemCount: execution.document.items.length,
+            sentCount: execution.result.sent,
+            failedCount: execution.result.failed,
+            deliveryJobId: execution.logs[0]?.jobId ?? null,
+          });
           process.stderr.write(
             `[assembly-api-mcp] 예약 발송 완료: ${job.id}\n`,
           );
@@ -79,12 +97,36 @@ export class NewsletterScheduleProcessor {
               ? "새로 발견된 법안이 없어 이번 회차를 건너뛰었습니다."
               : "조건에 맞는 법안이 없어 이번 회차를 건너뛰었습니다.";
             await this.store.markSkipped(job.id, skipMessage, new Date());
+            await this.appendRunLog({
+              scheduleJobId: job.id,
+              scheduleSubject: job.payload.subject ?? "[입법예고 뉴스레터]",
+              recurrence: job.recurrence,
+              status: "skipped",
+              message: skipMessage,
+              keyword: job.payload.query.keyword?.trim() || null,
+              itemCount: 0,
+              sentCount: 0,
+              failedCount: 0,
+              deliveryJobId: null,
+            });
             process.stderr.write(
               `[assembly-api-mcp] 예약 발송 건너뜀: ${job.id} - ${skipMessage}\n`,
             );
             continue;
           }
           await this.store.markFailed(job.id, message);
+          await this.appendRunLog({
+            scheduleJobId: job.id,
+            scheduleSubject: job.payload.subject ?? "[입법예고 뉴스레터]",
+            recurrence: job.recurrence,
+            status: "failed",
+            message,
+            keyword: job.payload.query.keyword?.trim() || null,
+            itemCount: 0,
+            sentCount: 0,
+            failedCount: 0,
+            deliveryJobId: null,
+          });
           process.stderr.write(
             `[assembly-api-mcp] 예약 발송 실패: ${job.id} - ${message}\n`,
           );
@@ -92,6 +134,19 @@ export class NewsletterScheduleProcessor {
       }
     } finally {
       this.running = false;
+    }
+  }
+
+  private async appendRunLog(
+    input: Parameters<Pick<ScheduledNewsletterRunStore, "append">["append"]>[0],
+  ): Promise<void> {
+    try {
+      await this.runStore.append(input);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(
+        `[assembly-api-mcp] 예약 실행 로그 저장 실패: ${input.scheduleJobId} - ${message}\n`,
+      );
     }
   }
 }

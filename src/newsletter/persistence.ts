@@ -7,6 +7,8 @@ import {
   type NewsletterDocument,
   type RecipientGroupRecord,
   type RecipientRecord,
+  type ScheduledNewsletterRunRecord,
+  type SavedNewsletterSubscriptionRecord,
   type SavedSearchPresetQuery,
   type SavedSearchPresetRecord,
   type SentNewsletterSnapshotRecord,
@@ -20,7 +22,9 @@ const DEFAULT_DATA_DIR = ".newsletter-data";
 const RECIPIENTS_FILE = "recipients.json";
 const RECIPIENT_GROUPS_FILE = "recipient-groups.json";
 const SEND_LOGS_FILE = "send-logs.json";
+const SCHEDULE_RUN_LOGS_FILE = "schedule-run-logs.json";
 const SEARCH_PRESETS_FILE = "search-presets.json";
+const NEWSLETTER_SUBSCRIPTIONS_FILE = "newsletter-subscriptions.json";
 const SCHEDULED_JOBS_FILE = "scheduled-jobs.json";
 const SENT_SNAPSHOTS_DIR = "sent-newsletters";
 
@@ -151,6 +155,16 @@ export class RecipientGroupStore {
       );
   }
 
+  async get(id: string): Promise<RecipientGroupRecord | null> {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      return null;
+    }
+
+    const items = await this.list();
+    return items.find((item) => item.id === normalizedId) ?? null;
+  }
+
   async upsert(name: string, emails: readonly string[]): Promise<RecipientGroupRecord> {
     const normalizedName = normalizeRecipientGroupName(name);
     const normalizedEmails = normalizeRecipientGroupEmails(emails);
@@ -225,6 +239,20 @@ export class SendLogStore {
       .slice(0, limit);
   }
 
+  async get(id: string): Promise<SendLogRecord | null> {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      return null;
+    }
+
+    const items = await readJsonArray<SendLogRecord>(
+      resolve(this.dataDir, SEND_LOGS_FILE),
+    );
+    return items
+      .map((item) => normalizeSendLogRecord(item))
+      .find((item) => item.id === normalizedId) ?? null;
+  }
+
   async appendLogs(
     document: NewsletterDocument,
     recipients: readonly string[],
@@ -256,6 +284,43 @@ export class SendLogStore {
 
     await writeJsonArray(filePath, [...newLogs, ...items].slice(0, 500));
     return newLogs;
+  }
+}
+
+export class ScheduledNewsletterRunStore {
+  constructor(
+    private readonly dataDir: string = resolveNewsletterDataDir(),
+  ) {}
+
+  async list(
+    limit = 20,
+    scheduleJobId?: string | null,
+  ): Promise<readonly ScheduledNewsletterRunRecord[]> {
+    const normalizedScheduleJobId = normalizeOptionalText(scheduleJobId);
+    const items = await readJsonArray<ScheduledNewsletterRunRecord>(
+      resolve(this.dataDir, SCHEDULE_RUN_LOGS_FILE),
+    );
+
+    return items
+      .map((item) => normalizeScheduledNewsletterRunRecord(item))
+      .filter((item) => normalizedScheduleJobId ? item.scheduleJobId === normalizedScheduleJobId : true)
+      .sort((left, right) => right.runAt.localeCompare(left.runAt))
+      .slice(0, limit);
+  }
+
+  async append(
+    input: Omit<ScheduledNewsletterRunRecord, "id" | "runAt"> & { readonly runAt?: string | null },
+  ): Promise<ScheduledNewsletterRunRecord> {
+    const filePath = resolve(this.dataDir, SCHEDULE_RUN_LOGS_FILE);
+    const items = await readJsonArray<ScheduledNewsletterRunRecord>(filePath);
+    const record = normalizeScheduledNewsletterRunRecord({
+      ...input,
+      id: randomUUID(),
+      runAt: input.runAt ?? formatNowKst(),
+    });
+
+    await writeJsonArray(filePath, [record, ...items].slice(0, 500));
+    return record;
   }
 }
 
@@ -397,6 +462,95 @@ export class SearchPresetStore {
   }
 }
 
+export class NewsletterSubscriptionStore {
+  constructor(
+    private readonly dataDir: string = resolveNewsletterDataDir(),
+  ) {}
+
+  async list(): Promise<readonly SavedNewsletterSubscriptionRecord[]> {
+    const items = await readJsonArray<SavedNewsletterSubscriptionRecord>(
+      resolve(this.dataDir, NEWSLETTER_SUBSCRIPTIONS_FILE),
+    );
+
+    return items
+      .map((item) => normalizeNewsletterSubscriptionRecord(item))
+      .sort((left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt)
+          || left.name.localeCompare(right.name),
+      );
+  }
+
+  async get(id: string): Promise<SavedNewsletterSubscriptionRecord | null> {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      return null;
+    }
+
+    const items = await this.list();
+    return items.find((item) => item.id === normalizedId) ?? null;
+  }
+
+  async upsert(
+    name: string,
+    input: Omit<SavedNewsletterSubscriptionRecord, "id" | "name" | "createdAt" | "updatedAt">,
+  ): Promise<SavedNewsletterSubscriptionRecord> {
+    const normalizedName = normalizePresetName(name);
+    const normalizedInput = normalizeNewsletterSubscriptionInput(input);
+    const now = formatNowKst();
+    const filePath = resolve(this.dataDir, NEWSLETTER_SUBSCRIPTIONS_FILE);
+    const items = (await readJsonArray<SavedNewsletterSubscriptionRecord>(filePath))
+      .map((item) => normalizeNewsletterSubscriptionRecord(item));
+    const existing = items.find((item) =>
+      item.name.localeCompare(normalizedName, undefined, { sensitivity: "accent" }) === 0
+      || item.name.toLowerCase() === normalizedName.toLowerCase(),
+    );
+
+    let record: SavedNewsletterSubscriptionRecord;
+    if (existing) {
+      record = {
+        ...existing,
+        ...normalizedInput,
+        name: normalizedName,
+        updatedAt: now,
+      };
+      await writeJsonArray(
+        filePath,
+        items.map((item) => item.id === existing.id ? record : item),
+      );
+      return record;
+    }
+
+    record = {
+      id: randomUUID(),
+      name: normalizedName,
+      ...normalizedInput,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await writeJsonArray(filePath, [...items, record]);
+    return record;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      throw new Error("삭제할 구독 템플릿 id가 필요합니다.");
+    }
+
+    const filePath = resolve(this.dataDir, NEWSLETTER_SUBSCRIPTIONS_FILE);
+    const items = (await readJsonArray<SavedNewsletterSubscriptionRecord>(filePath))
+      .map((item) => normalizeNewsletterSubscriptionRecord(item));
+    const filtered = items.filter((item) => item.id !== normalizedId);
+    if (filtered.length === items.length) {
+      return false;
+    }
+
+    await writeJsonArray(filePath, filtered);
+    return true;
+  }
+}
+
 export class ScheduledNewsletterJobStore {
   constructor(
     private readonly dataDir: string = resolveNewsletterDataDir(),
@@ -452,7 +606,10 @@ export class ScheduledNewsletterJobStore {
     const now = formatNowKst();
 
     const next = items.map((item) => {
-      if (item.id !== normalizedId || (item.status !== "pending" && item.status !== "failed")) {
+      if (
+        item.id !== normalizedId
+        || (item.status !== "pending" && item.status !== "paused" && item.status !== "failed")
+      ) {
         return item;
       }
       changed = true;
@@ -469,6 +626,44 @@ export class ScheduledNewsletterJobStore {
 
     await writeJsonArray(filePath, next);
     return true;
+  }
+
+  async pause(id: string): Promise<boolean> {
+    return updateScheduledJob(
+      resolve(this.dataDir, SCHEDULED_JOBS_FILE),
+      id,
+      (item, now) => {
+        if (item.status !== "pending") {
+          return item;
+        }
+
+        return {
+          ...item,
+          status: "paused",
+          updatedAt: now,
+          errorMessage: null,
+        };
+      },
+    );
+  }
+
+  async resume(id: string): Promise<boolean> {
+    return updateScheduledJob(
+      resolve(this.dataDir, SCHEDULED_JOBS_FILE),
+      id,
+      (item, now) => {
+        if (item.status !== "paused" && item.status !== "failed") {
+          return item;
+        }
+
+        return {
+          ...item,
+          status: "pending",
+          updatedAt: now,
+          errorMessage: null,
+        };
+      },
+    );
   }
 
   async claimDueJobs(
@@ -706,6 +901,28 @@ function normalizeSendLogRecord(item: SendLogRecord): SendLogRecord {
   };
 }
 
+function normalizeScheduledNewsletterRunRecord(
+  item: ScheduledNewsletterRunRecord,
+): ScheduledNewsletterRunRecord {
+  const subject = normalizeOptionalText(item.scheduleSubject) ?? "[입법예고 뉴스레터]";
+
+  return {
+    id: normalizeOptionalText(item.id) ?? randomUUID(),
+    scheduleJobId: normalizeOptionalText(item.scheduleJobId)
+      ?? (() => { throw new Error("예약 실행 로그에는 scheduleJobId가 필요합니다."); })(),
+    scheduleSubject: subject,
+    recurrence: normalizeRecurrence(item.recurrence),
+    status: normalizeLastRunStatus(item.status) ?? "failed",
+    message: normalizeOptionalText(item.message),
+    keyword: normalizeOptionalText(item.keyword),
+    itemCount: normalizeNonNegativeInteger(item.itemCount),
+    sentCount: normalizeNonNegativeInteger(item.sentCount),
+    failedCount: normalizeNonNegativeInteger(item.failedCount),
+    deliveryJobId: normalizeOptionalText(item.deliveryJobId),
+    runAt: normalizeOptionalText(item.runAt) ?? formatNowKst(),
+  };
+}
+
 function normalizePresetName(value: string): string {
   const normalized = value.trim();
   if (!normalized) {
@@ -729,6 +946,38 @@ function normalizeSavedSearchPresetQuery(
     noticeScope: query.noticeScope === "active_only" ? "active_only" : "include_closed",
     sortBy: normalizeSortBy(query.sortBy),
     pageSize: clampPageSize(query.pageSize),
+  };
+}
+
+function normalizeNewsletterSubscriptionInput(
+  input: Omit<SavedNewsletterSubscriptionRecord, "id" | "name" | "createdAt" | "updatedAt">,
+): Omit<SavedNewsletterSubscriptionRecord, "id" | "name" | "createdAt" | "updatedAt"> {
+  return {
+    query: normalizeSavedSearchPresetQuery(input.query),
+    recipientGroupId: normalizeOptionalText(input.recipientGroupId),
+    recipientGroupName: normalizeOptionalText(input.recipientGroupName),
+    searchPresetId: normalizeOptionalText(input.searchPresetId),
+    searchPresetName: normalizeOptionalText(input.searchPresetName),
+    recipients: normalizeRecipientGroupEmails(input.recipients),
+    subject: normalizeOptionalText(input.subject),
+    introText: normalizeOptionalText(input.introText),
+    outroText: normalizeOptionalText(input.outroText),
+    recurrence: normalizeRecurrence(input.recurrence),
+    onlyNewResults: input.onlyNewResults === true,
+  };
+}
+
+function normalizeNewsletterSubscriptionRecord(
+  item: SavedNewsletterSubscriptionRecord,
+): SavedNewsletterSubscriptionRecord {
+  const createdAt = normalizeOptionalText(item.createdAt) ?? formatNowKst();
+
+  return {
+    id: normalizeOptionalText(item.id) ?? randomUUID(),
+    name: normalizePresetName(item.name),
+    ...normalizeNewsletterSubscriptionInput(item),
+    createdAt,
+    updatedAt: normalizeOptionalText(item.updatedAt) ?? createdAt,
   };
 }
 
@@ -775,6 +1024,14 @@ function clampPageSize(value: number | null | undefined): number {
   return Math.min(value, 100);
 }
 
+function normalizeNonNegativeInteger(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.trunc(value));
+}
+
 function normalizeNewsletterSendPayload(
   payload: NewsletterSendPayload,
 ): NewsletterSendPayload {
@@ -788,6 +1045,8 @@ function normalizeNewsletterSendPayload(
     includeAllResults: payload.includeAllResults === true,
     onlyNewResults: payload.onlyNewResults === true,
     excludeBillIds: normalizeBillIdList(payload.excludeBillIds),
+    recipientGroupId: normalizeOptionalText(payload.recipientGroupId),
+    recipientGroupName: normalizeOptionalText(payload.recipientGroupName),
     searchPresetId: normalizeOptionalText(payload.searchPresetId),
     searchPresetName: normalizeOptionalText(payload.searchPresetName),
     recipients: payload.recipients.map((recipient) => normalizeEmail(recipient)),
@@ -839,7 +1098,14 @@ function normalizeScheduledJobRecord(
 function normalizeScheduledJobStatus(
   value: ScheduledNewsletterJobRecord["status"] | string | undefined,
 ): ScheduledNewsletterJobRecord["status"] {
-  if (value === "processing" || value === "sent" || value === "skipped" || value === "failed" || value === "cancelled") {
+  if (
+    value === "processing"
+    || value === "paused"
+    || value === "sent"
+    || value === "skipped"
+    || value === "failed"
+    || value === "cancelled"
+  ) {
     return value;
   }
   return "pending";
@@ -918,8 +1184,11 @@ async function updateScheduledJob(
     if (item.id !== normalizedId) {
       return item;
     }
-    changed = true;
-    return updater(item, now);
+    const updatedItem = updater(item, now);
+    if (updatedItem !== item) {
+      changed = true;
+    }
+    return updatedItem;
   });
 
   if (!changed) {
@@ -940,7 +1209,7 @@ function compareScheduledJobPriority(
     return leftRank - rightRank;
   }
 
-  if (leftRank <= 1) {
+  if (leftRank <= 2) {
     return left.scheduledAt.localeCompare(right.scheduledAt);
   }
 
@@ -950,10 +1219,11 @@ function compareScheduledJobPriority(
 function getScheduledJobStatusRank(status: ScheduledNewsletterJobRecord["status"]): number {
   if (status === "pending") return 0;
   if (status === "processing") return 1;
-  if (status === "failed") return 2;
-  if (status === "sent") return 3;
-  if (status === "skipped") return 4;
-  return 5;
+  if (status === "paused") return 2;
+  if (status === "failed") return 3;
+  if (status === "sent") return 4;
+  if (status === "skipped") return 5;
+  return 6;
 }
 
 function formatNowKst(): string {
