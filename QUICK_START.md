@@ -231,6 +231,54 @@ claude mcp add assembly-api -- node /absolute/path/to/assembly-api-mcp/dist/inde
 
 > Lite 프로필(기본)에서는 7개 통합 도구가 사용됩니다.
 
+### 브라우저 GUI에서
+
+HTTP 모드로 실행하면 브라우저용 입법예고 뉴스레터 화면을 사용할 수 있습니다:
+
+```bash
+ASSEMBLY_API_KEY=your-api-key MCP_TRANSPORT=http MCP_PORT=3000 npm start
+```
+
+접속 주소:
+
+```text
+http://localhost:3000/newsletter
+```
+
+가능한 작업:
+
+- 키워드와 기간으로 입법예고 검색
+- 검색 조건 preset 저장, 다시 불러오기, 삭제
+- 진행중만 보기 또는 종료된 입법예고 포함 검색
+- 관련도 순 또는 종료일 기준 정렬
+- 10/20/50건 단위 페이지 이동
+- 검색 결과 일부 선택
+- 페이지를 넘겨도 선택 항목 유지
+- 메일 제목, 브리핑 메모, 마무리 문구 편집
+- HTML 이메일 미리보기
+- Markdown 다운로드
+- 다중 이메일 수신자 발송
+- 발송 로그에서 보낸 HTML/Markdown 스냅샷 다시 확인
+- 발송 로그를 현재 수신자에게 재전송
+- 한 번, 매일, 매주 반복 예약 발송 등록과 취소
+- 전체 결과 예약을 저장된 검색 preset과 연결
+- 반복 예약에서 새로 발견된 법안만 발송
+
+예약 발송은 서버가 실행 중일 때 처리됩니다. 서버가 내려가 있으면 다음 실행 시점에 미처리 예약을 다시 확인합니다. 반복 예약은 성공하면 다음 시각으로 넘어가고, 실패하면 상태를 남기고 멈춥니다. 검색 결과가 없는 회차는 실패 대신 `건너뜀`으로 남기고 다음 회차로 이동합니다. 전체 결과 예약에서 저장된 검색 preset을 고르면, 이후 발송 때마다 그 preset의 최신 조건을 다시 반영합니다. `새로 발견된 법안만 발송`을 켜면 같은 예약에서 이미 발송했던 법안은 제외합니다.
+
+이메일 발송을 사용하려면 `.env`에 SMTP 설정을 추가하세요:
+
+```env
+NEWSLETTER_SMTP_HOST=smtp.example.com
+NEWSLETTER_SMTP_PORT=465
+NEWSLETTER_SMTP_SECURE=true
+NEWSLETTER_SMTP_USER=your-account
+NEWSLETTER_SMTP_PASS=your-password
+NEWSLETTER_SMTP_FROM_EMAIL=no-reply@example.com
+NEWSLETTER_SMTP_FROM_NAME=입법예고 뉴스레터
+NEWSLETTER_DATA_DIR=/absolute/path/to/newsletter-data
+```
+
 ### CLI에서
 
 ```bash

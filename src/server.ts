@@ -26,6 +26,8 @@ import { registerResearchTools } from "./tools/research.js";
 import { registerBillExtraTools } from "./tools/bill-extras.js";
 import { registerResources } from "./resources/static-data.js";
 import { registerPrompts } from "./prompts/templates.js";
+import { createNewsletterScheduleProcessor } from "./newsletter/scheduler.js";
+import { handleNewsletterRequest } from "./web-api/newsletter-routes.js";
 
 // ---------------------------------------------------------------------------
 // MCP Server factory (transport-agnostic)
@@ -97,6 +99,7 @@ const SESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 async function startHttpTransport(config: AppConfig): Promise<McpServer> {
   const sessions = new Map<string, SessionEntry>();
+  const newsletterScheduler = createNewsletterScheduleProcessor(config);
 
   // Periodic cleanup of stale sessions
   const cleanupTimer = setInterval(() => {
@@ -115,24 +118,31 @@ async function startHttpTransport(config: AppConfig): Promise<McpServer> {
 
   const httpServer = createHttpServer(
     (req: IncomingMessage, res: ServerResponse) => {
-      const url = req.url ?? "/";
+      const requestUrl = new URL(req.url ?? "/", "http://localhost");
+      const pathname = requestUrl.pathname;
 
       // Health-check endpoint
-      if (url === "/health" && req.method === "GET") {
+      if (pathname === "/health" && req.method === "GET") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ status: "ok", sessions: sessions.size }));
         return;
       }
 
       // MCP endpoint — per-session transport routing
-      if (url === MCP_ENDPOINT) {
+      if (pathname === MCP_ENDPOINT) {
         void handleMcpRequest(req, res, config, sessions);
         return;
       }
 
-      // Everything else → 404
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Not found" }));
+      void handleNewsletterRequest(req, res, config).then((handled) => {
+        if (handled) return;
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Not found" }));
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: message }));
+      });
     },
   );
 
@@ -148,10 +158,13 @@ async function startHttpTransport(config: AppConfig): Promise<McpServer> {
     });
   });
 
+  await newsletterScheduler.start();
+
   // Graceful shutdown
   const shutdown = async (): Promise<void> => {
     process.stderr.write("[assembly-api-mcp] 서버를 종료합니다...\n");
     clearInterval(cleanupTimer);
+    await newsletterScheduler.stop();
     const closePromises = Array.from(sessions.values()).map((entry) =>
       entry.transport.close(),
     );

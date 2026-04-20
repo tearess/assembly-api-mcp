@@ -1,0 +1,167 @@
+export type DatePreset = "6m" | "3m" | "1m" | "3w" | "2w" | "1w" | "custom";
+export type NoticeScope = "active_only" | "include_closed";
+export type LegislationSortBy = "relevance" | "notice_end_desc" | "notice_end_asc";
+
+export interface LegislationSearchQuery {
+  readonly keyword?: string;
+  readonly datePreset?: DatePreset;
+  readonly dateFrom?: string;
+  readonly dateTo?: string;
+  readonly noticeScope?: NoticeScope;
+  readonly sortBy?: LegislationSortBy;
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface ResolvedDateRange {
+  readonly datePreset: DatePreset;
+  readonly dateFrom: string;
+  readonly dateTo: string;
+  readonly timeZone: string;
+}
+
+export type NoticeStatus = "active" | "closed";
+
+export interface LegislationItem {
+  readonly billId: string;
+  readonly billNo: string;
+  readonly billName: string;
+  readonly proposer: string;
+  readonly committee: string;
+  readonly noticeStatus: NoticeStatus;
+  readonly billStage: string | null;
+  readonly stageLabel: string;
+  readonly noticeEndDate: string | null;
+  readonly summary: string;
+  readonly detailUrl: string | null;
+  readonly relevanceScore: number;
+  readonly raw: Record<string, unknown>;
+}
+
+export interface LegislationSearchResultQuery {
+  readonly keyword: string | null;
+  readonly datePreset: DatePreset;
+  readonly dateFrom: string;
+  readonly dateTo: string;
+  readonly noticeScope: NoticeScope;
+  readonly sortBy: LegislationSortBy;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly timeZone: string;
+}
+
+export interface LegislationSearchResult {
+  readonly query: LegislationSearchResultQuery;
+  readonly total: number;
+  readonly totalPages: number;
+  readonly items: readonly LegislationItem[];
+}
+
+export interface NewsletterDocument {
+  readonly subject: string;
+  readonly keyword: string | null;
+  readonly dateFrom: string;
+  readonly dateTo: string;
+  readonly timeZone: string;
+  readonly generatedAt: string;
+  readonly introText?: string | null;
+  readonly outroText?: string | null;
+  readonly items: readonly LegislationItem[];
+}
+
+export interface NewsletterContentPayload {
+  readonly query: LegislationSearchQuery;
+  readonly items: readonly LegislationItem[];
+  readonly selectedBillIds: readonly string[];
+  readonly subject: string | null;
+  readonly introText?: string | null;
+  readonly outroText?: string | null;
+  readonly includeAllResults: boolean;
+  readonly onlyNewResults?: boolean | null;
+  readonly excludeBillIds?: readonly string[] | null;
+  readonly searchPresetId?: string | null;
+  readonly searchPresetName?: string | null;
+}
+
+export interface NewsletterSendPayload extends NewsletterContentPayload {
+  readonly recipients: readonly string[];
+}
+
+export interface RecipientRecord {
+  readonly email: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface RecipientGroupRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly emails: readonly string[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface SendLogRecord {
+  readonly id: string;
+  readonly jobId: string;
+  readonly recipientEmail: string;
+  readonly status: "sent" | "failed";
+  readonly errorMessage: string | null;
+  readonly subject: string;
+  readonly keyword: string | null;
+  readonly itemCount: number;
+  readonly snapshotAvailable: boolean;
+  readonly sentAt: string;
+}
+
+export interface SentNewsletterSnapshotRecord {
+  readonly jobId: string;
+  readonly document: NewsletterDocument;
+  readonly html: string;
+  readonly markdown: string;
+  readonly createdAt: string;
+}
+
+export interface SavedSearchPresetQuery {
+  readonly keyword: string | null;
+  readonly datePreset: DatePreset;
+  readonly dateFrom: string | null;
+  readonly dateTo: string | null;
+  readonly noticeScope: NoticeScope;
+  readonly sortBy: LegislationSortBy;
+  readonly pageSize: number;
+}
+
+export interface SavedSearchPresetRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly query: SavedSearchPresetQuery;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export type ScheduledNewsletterJobStatus =
+  | "pending"
+  | "processing"
+  | "sent"
+  | "skipped"
+  | "failed"
+  | "cancelled";
+
+export type ScheduledNewsletterRecurrence = "once" | "daily" | "weekly";
+export type ScheduledNewsletterJobRunStatus = "sent" | "failed" | "skipped";
+
+export interface ScheduledNewsletterJobRecord {
+  readonly id: string;
+  readonly scheduledAt: string;
+  readonly recurrence: ScheduledNewsletterRecurrence;
+  readonly status: ScheduledNewsletterJobStatus;
+  readonly payload: NewsletterSendPayload;
+  readonly deliveredBillIds: readonly string[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly processedAt: string | null;
+  readonly lastRunStatus: ScheduledNewsletterJobRunStatus | null;
+  readonly lastRunMessage: string | null;
+  readonly errorMessage: string | null;
+}

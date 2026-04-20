@@ -1,0 +1,382 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+import {
+  RecipientStore,
+  SearchPresetStore,
+  ScheduledNewsletterJobStore,
+  SentNewsletterStore,
+  SendLogStore,
+} from "../../src/newsletter/persistence.js";
+import {
+  type NewsletterDocument,
+  type NewsletterSendPayload,
+} from "../../src/newsletter/types.js";
+
+function createDocument(): NewsletterDocument {
+  return {
+    subject: "[입법예고 뉴스레터] 인공지능 관련 법안 브리핑",
+    keyword: "인공지능",
+    dateFrom: "2026-03-20",
+    dateTo: "2026-04-20",
+    timeZone: "Asia/Seoul",
+    generatedAt: "2026-04-20 10:30",
+    items: [
+      {
+        billId: "BILL_001",
+        billNo: "2200001",
+        billName: "인공지능 산업 진흥법 일부개정법률안",
+        proposer: "홍길동",
+        committee: "과학기술정보방송통신위원회",
+        noticeStatus: "active",
+        billStage: "법사위 심사",
+        stageLabel: "입법예고 진행중 / 법사위 심사",
+        noticeEndDate: "2026-04-28",
+        summary: "요약",
+        detailUrl: "https://open.assembly.go.kr/example",
+        relevanceScore: 1,
+        raw: {},
+      },
+    ],
+  };
+}
+
+function createSendPayload(): NewsletterSendPayload {
+  return {
+    query: {
+      keyword: "인공지능",
+      datePreset: "1m",
+      noticeScope: "include_closed",
+      sortBy: "relevance",
+      page: 1,
+      pageSize: 20,
+    },
+    items: [],
+    selectedBillIds: [],
+    subject: "[입법예고 뉴스레터] 인공지능 관련 법안 브리핑",
+    includeAllResults: true,
+    recipients: ["alpha@example.com", "beta@example.com"],
+  };
+}
+
+describe("newsletter/persistence", () => {
+  it("수신자를 저장하고 중복 없이 다시 불러온다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new RecipientStore(dir);
+      await store.upsert("Alpha@example.com");
+      await store.upsert("alpha@example.com");
+      await store.upsert("beta@example.com");
+
+      const items = await store.list();
+      expect(items.map((item) => item.email)).toEqual([
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("수신자를 삭제할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new RecipientStore(dir);
+      await store.upsertMany(["alpha@example.com", "beta@example.com"]);
+      const deleted = await store.delete("beta@example.com");
+
+      expect(deleted).toBe(true);
+      const items = await store.list();
+      expect(items.map((item) => item.email)).toEqual(["alpha@example.com"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("발송 로그를 저장하고 최신순으로 조회한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new SendLogStore(dir);
+      const logs = await store.appendLogs(
+        createDocument(),
+        ["alpha@example.com", "beta@example.com"],
+        new Map([["beta@example.com", "SMTP timeout"]]),
+        {
+          jobId: "job-1",
+          snapshotAvailable: true,
+        },
+      );
+
+      expect(logs).toHaveLength(2);
+
+      const saved = await store.list();
+      expect(saved).toHaveLength(2);
+      expect(saved.map((item) => item.recipientEmail).sort()).toEqual([
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+      const failed = saved.find((item) => item.recipientEmail === "beta@example.com");
+      expect(failed?.status).toBe("failed");
+      expect(failed?.errorMessage).toBe("SMTP timeout");
+      expect(saved.every((item) => item.jobId === "job-1")).toBe(true);
+      expect(saved.every((item) => item.snapshotAvailable === true)).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("발송 HTML/Markdown 스냅샷을 저장하고 다시 불러온다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new SentNewsletterStore(dir);
+      const snapshot = await store.save(
+        "job-snapshot-1",
+        createDocument(),
+        "<html><body>preview</body></html>",
+        "# preview",
+      );
+
+      expect(snapshot.jobId).toBe("job-snapshot-1");
+      const loaded = await store.get("job-snapshot-1");
+      expect(loaded).toMatchObject({
+        jobId: "job-snapshot-1",
+        html: "<html><body>preview</body></html>",
+        markdown: "# preview",
+      });
+      expect(loaded?.document.subject).toBe(createDocument().subject);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("검색 preset을 저장하고 같은 이름이면 갱신한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new SearchPresetStore(dir);
+      const first = await store.upsert("AI 최근 1개월", {
+        keyword: "인공지능",
+        datePreset: "1m",
+        dateFrom: "2026-03-20",
+        dateTo: "2026-04-20",
+        noticeScope: "include_closed",
+        sortBy: "relevance",
+        pageSize: 20,
+      });
+
+      const updated = await store.upsert("ai 최근 1개월", {
+        keyword: "AI",
+        datePreset: "custom",
+        dateFrom: "2026-04-01",
+        dateTo: "2026-04-20",
+        noticeScope: "active_only",
+        sortBy: "notice_end_desc",
+        pageSize: 50,
+      });
+
+      expect(updated.id).toBe(first.id);
+      const items = await store.list();
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        name: "ai 최근 1개월",
+        query: {
+          keyword: "AI",
+          datePreset: "custom",
+          dateFrom: "2026-04-01",
+          dateTo: "2026-04-20",
+          noticeScope: "active_only",
+          sortBy: "notice_end_desc",
+          pageSize: 50,
+        },
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("검색 preset을 삭제할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new SearchPresetStore(dir);
+      const preset = await store.upsert("보건의료 3개월", {
+        keyword: "보건의료",
+        datePreset: "3m",
+        dateFrom: null,
+        dateTo: null,
+        noticeScope: "include_closed",
+        sortBy: "notice_end_asc",
+        pageSize: 10,
+      });
+
+      const deleted = await store.delete(preset.id);
+      expect(deleted).toBe(true);
+      expect(await store.list()).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("예약 발송 작업을 저장하고 due job을 처리 상태로 가져온다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00");
+
+      const claimed = await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      expect(claimed).toHaveLength(1);
+      expect(claimed[0]).toMatchObject({
+        id: job.id,
+        status: "processing",
+      });
+
+      await store.markSent(job.id);
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        recurrence: "once",
+        status: "sent",
+        lastRunStatus: "sent",
+      });
+      expect(saved[0]?.processedAt).toBeTruthy();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("반복 예약 발송은 성공 후 다음 시각으로 이동한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00", "daily");
+
+      const claimed = await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      expect(claimed).toHaveLength(1);
+      expect(claimed[0]).toMatchObject({
+        id: job.id,
+        recurrence: "daily",
+        status: "processing",
+      });
+
+      await store.markSent(job.id, new Date("2099-01-01T00:01:00Z"));
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        recurrence: "daily",
+        status: "pending",
+        lastRunStatus: "sent",
+      });
+      expect(saved[0]?.scheduledAt).toBe("2099-01-02T00:00:00.000Z");
+      expect(saved[0]?.deliveredBillIds).toEqual([]);
+      expect(saved[0]?.processedAt).toBeTruthy();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("반복 예약 발송은 전달한 bill id를 누적 저장한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(
+        {
+          ...createSendPayload(),
+          onlyNewResults: true,
+        },
+        "2099-01-01T09:00",
+        "daily",
+      );
+
+      await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      await store.markSent(
+        job.id,
+        new Date("2099-01-01T00:01:00Z"),
+        ["BILL_001", "BILL_002", "BILL_001"],
+      );
+
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        status: "pending",
+        lastRunStatus: "sent",
+      });
+      expect(saved[0]?.deliveredBillIds).toEqual(["BILL_001", "BILL_002"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("반복 예약 발송은 결과가 없으면 건너뛰고 다음 시각으로 이동한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00", "weekly");
+
+      await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      await store.markSkipped(job.id, "조건에 맞는 법안이 없어 이번 회차를 건너뛰었습니다.", new Date("2099-01-01T00:01:00Z"));
+
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        recurrence: "weekly",
+        status: "pending",
+        lastRunStatus: "skipped",
+        lastRunMessage: "조건에 맞는 법안이 없어 이번 회차를 건너뛰었습니다.",
+      });
+      expect(saved[0]?.scheduledAt).toBe("2099-01-08T00:00:00.000Z");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("단일 예약 발송은 결과가 없으면 건너뜀 상태로 마감한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-01T09:00");
+
+      await store.claimDueJobs(new Date("2099-01-01T00:01:00Z"));
+      await store.markSkipped(job.id, "조건에 맞는 법안이 없어 이번 회차를 건너뛰었습니다.", new Date("2099-01-01T00:01:00Z"));
+
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        recurrence: "once",
+        status: "skipped",
+        lastRunStatus: "skipped",
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("예약 발송 작업을 취소할 수 있다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const store = new ScheduledNewsletterJobStore(dir);
+      const job = await store.create(createSendPayload(), "2099-01-02T09:00");
+
+      const cancelled = await store.cancel(job.id);
+      expect(cancelled).toBe(true);
+
+      const saved = await store.list();
+      expect(saved[0]).toMatchObject({
+        id: job.id,
+        status: "cancelled",
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
