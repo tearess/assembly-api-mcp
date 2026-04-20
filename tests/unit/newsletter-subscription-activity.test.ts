@@ -144,6 +144,20 @@ describe("newsletter/subscription-activity", () => {
         },
         {
           id: "run-2",
+          scheduleJobId: "job-2",
+          scheduleSubject: "AI 정책 브리핑",
+          recurrence: "weekly",
+          status: "failed",
+          message: "no new bills",
+          keyword: "인공지능",
+          itemCount: 0,
+          sentCount: 0,
+          failedCount: 0,
+          deliveryJobId: null,
+          runAt: "2026-04-21 11:00:00",
+        },
+        {
+          id: "run-3",
           scheduleJobId: "job-3",
           scheduleSubject: "보건의료 브리핑",
           recurrence: "weekly",
@@ -166,8 +180,11 @@ describe("newsletter/subscription-activity", () => {
       activeScheduleCount: 1,
       pausedScheduleCount: 1,
       failedScheduleCount: 0,
-      latestRunStatus: "sent",
-      latestRunAt: "2026-04-20 10:00:00",
+      latestRunStatus: "failed",
+      latestRunAt: "2026-04-21 11:00:00",
+      latestRunMessage: "no new bills",
+      latestSnapshotJobId: "delivery-1",
+      latestSnapshotAt: "2026-04-20 10:00:00",
     });
     expect(records[1]).toMatchObject({
       subscriptionId: "subscription-2",
@@ -178,6 +195,8 @@ describe("newsletter/subscription-activity", () => {
       latestRunStatus: "failed",
       latestRunAt: "2026-04-21 09:00:00",
       latestRunMessage: "SMTP timeout",
+      latestSnapshotJobId: null,
+      latestSnapshotAt: null,
     });
   });
 });

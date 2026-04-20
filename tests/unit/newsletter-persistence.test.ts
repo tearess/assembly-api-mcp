@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  exportNewsletterSettingsBundle,
+  importNewsletterSettingsBundle,
   NewsletterSubscriptionStore,
   RecipientGroupStore,
   RecipientStore,
@@ -160,6 +162,86 @@ describe("newsletter/persistence", () => {
       expect(await store.list()).toEqual([]);
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("설정 백업을 내보내고 다른 저장소에 그대로 복원할 수 있다", async () => {
+    const sourceDir = await mkdtemp(join(tmpdir(), "assembly-newsletter-source-"));
+    const targetDir = await mkdtemp(join(tmpdir(), "assembly-newsletter-target-"));
+
+    try {
+      const recipientStore = new RecipientStore(sourceDir);
+      const groupStore = new RecipientGroupStore(sourceDir);
+      const presetStore = new SearchPresetStore(sourceDir);
+      const subscriptionStore = new NewsletterSubscriptionStore(sourceDir);
+
+      await recipientStore.upsertMany(["alpha@example.com", "beta@example.com"]);
+      const group = await groupStore.upsert("정책팀 전체", [
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+      const preset = await presetStore.upsert("AI 브리핑", {
+        keyword: "인공지능",
+        datePreset: "1m",
+        dateFrom: null,
+        dateTo: null,
+        noticeScope: "include_closed",
+        sortBy: "relevance",
+        pageSize: 20,
+      });
+      const subscription = await subscriptionStore.upsert("AI 정책 구독", {
+        query: preset.query,
+        recipientGroupId: group.id,
+        recipientGroupName: group.name,
+        searchPresetId: preset.id,
+        searchPresetName: preset.name,
+        recipients: group.emails,
+        subject: "[입법예고 뉴스레터] AI 정책 브리핑",
+        introText: "브리핑 메모",
+        outroText: "마무리 문구",
+        recurrence: "weekly",
+        onlyNewResults: true,
+      });
+
+      const bundle = await exportNewsletterSettingsBundle(sourceDir);
+      expect(bundle.version).toBe(1);
+      expect(bundle.recipients).toHaveLength(2);
+      expect(bundle.recipientGroups).toHaveLength(1);
+      expect(bundle.searchPresets).toHaveLength(1);
+      expect(bundle.subscriptionTemplates).toHaveLength(1);
+
+      await new RecipientStore(targetDir).upsert("legacy@example.com");
+      await importNewsletterSettingsBundle(bundle, targetDir);
+
+      const targetRecipients = await new RecipientStore(targetDir).list();
+      const targetGroups = await new RecipientGroupStore(targetDir).list();
+      const targetPresets = await new SearchPresetStore(targetDir).list();
+      const targetSubscriptions = await new NewsletterSubscriptionStore(targetDir).list();
+
+      expect(targetRecipients.map((item) => item.email)).toEqual([
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+      expect(targetGroups[0]).toMatchObject({
+        id: group.id,
+        name: "정책팀 전체",
+        emails: ["alpha@example.com", "beta@example.com"],
+      });
+      expect(targetPresets[0]).toMatchObject({
+        id: preset.id,
+        name: "AI 브리핑",
+      });
+      expect(targetSubscriptions[0]).toMatchObject({
+        id: subscription.id,
+        name: "AI 정책 구독",
+        recipientGroupId: group.id,
+        searchPresetId: preset.id,
+        recurrence: "weekly",
+        onlyNewResults: true,
+      });
+    } finally {
+      await rm(sourceDir, { recursive: true, force: true });
+      await rm(targetDir, { recursive: true, force: true });
     }
   });
 

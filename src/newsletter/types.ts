@@ -195,6 +195,15 @@ export interface NewsletterOperationalSummary {
   };
 }
 
+export interface NewsletterSettingsBundle {
+  readonly version: 1;
+  readonly exportedAt: string;
+  readonly recipients: readonly RecipientRecord[];
+  readonly recipientGroups: readonly RecipientGroupRecord[];
+  readonly searchPresets: readonly SavedSearchPresetRecord[];
+  readonly subscriptionTemplates: readonly SavedNewsletterSubscriptionRecord[];
+}
+
 export interface NewsletterSubscriptionActivityRecord {
   readonly subscriptionId: string;
   readonly scheduleCount: number;
@@ -204,6 +213,8 @@ export interface NewsletterSubscriptionActivityRecord {
   readonly latestRunStatus: ScheduledNewsletterJobRunStatus | null;
   readonly latestRunAt: string | null;
   readonly latestRunMessage: string | null;
+  readonly latestSnapshotJobId: string | null;
+  readonly latestSnapshotAt: string | null;
 }
 
 export interface SavedNewsletterSubscriptionRecord {

@@ -240,10 +240,57 @@ export function buildNewsletterAppHtml(): string {
       font-size: 0.94rem;
     }
 
+    .saved-preset-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
     .saved-preset-meta {
       color: var(--muted);
       font-size: 0.82rem;
       line-height: 1.5;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 28px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      border: 1px solid rgba(24, 53, 47, 0.08);
+      background: rgba(24, 53, 47, 0.06);
+      color: var(--ink);
+    }
+
+    .status-badge.active {
+      background: rgba(15, 118, 98, 0.14);
+      color: #0b5a4b;
+    }
+
+    .status-badge.warning {
+      background: rgba(217, 141, 63, 0.16);
+      color: #8a4f16;
+    }
+
+    .status-badge.danger {
+      background: rgba(183, 75, 52, 0.14);
+      color: #97341f;
+    }
+
+    .status-badge.muted {
+      background: rgba(95, 118, 111, 0.12);
+      color: #4f6660;
+    }
+
+    .subscription-filter-meta {
+      margin-top: 10px;
     }
 
     .saved-preset-actions {
@@ -831,6 +878,14 @@ export function buildNewsletterAppHtml(): string {
             </div>
           </div>
           <div class="summary-grid" id="operationalSummaryGrid"></div>
+          <div class="saved-preset-actions" style="justify-content: flex-start; margin-top: 12px;">
+            <button id="exportSettingsBtn" class="ghost-btn" type="button">설정 백업</button>
+            <button id="importSettingsBtn" class="ghost-btn" type="button">설정 복원</button>
+          </div>
+          <input id="settingsImportInput" type="file" accept=".json,application/json" hidden>
+          <div class="subtle" style="margin-top: 8px;">
+            수신자, 수신자 그룹, 검색 preset, 구독 템플릿을 JSON으로 백업하거나 복원합니다. 예약 발송과 로그는 포함되지 않습니다.
+          </div>
 
           <div class="recipient-row">
             <input id="recipientInput" type="email" placeholder="recipient@example.com">
@@ -909,6 +964,23 @@ export function buildNewsletterAppHtml(): string {
             </label>
             <button id="saveSubscriptionBtn" class="accent-btn" type="button">현재 설정 저장</button>
           </div>
+          <div class="saved-preset-row">
+            <label>
+              구독 템플릿 찾기
+              <input id="subscriptionFilterInput" type="text" placeholder="이름, 키워드, 메일 제목으로 찾기">
+            </label>
+            <label>
+              템플릿 상태
+              <select id="subscriptionFilterSelect">
+                <option value="all">전체</option>
+                <option value="active">활성 예약 있음</option>
+                <option value="attention">주의 필요</option>
+                <option value="history">이력만 있음</option>
+                <option value="no_schedule">예약 없음</option>
+              </select>
+            </label>
+          </div>
+          <div class="subtle subscription-filter-meta" id="subscriptionFilterMeta">구독 템플릿을 불러오는 중입니다.</div>
           <div class="saved-preset-list" id="savedSubscriptionList">
             <span class="subtle">저장된 구독 템플릿이 없습니다.</span>
           </div>
@@ -922,9 +994,52 @@ export function buildNewsletterAppHtml(): string {
               <div class="subtle">성공, 건너뜀, 실패 기록을 최근 순으로 확인합니다.</div>
             </div>
           </div>
+          <div class="saved-preset-row">
+            <label>
+              예약 실행 이력 찾기
+              <input id="scheduleRunSearchInput" type="text" placeholder="제목, 키워드, 메시지로 찾기">
+            </label>
+            <label>
+              실행 결과
+              <select id="scheduleRunStatusSelect">
+                <option value="all">전체</option>
+                <option value="sent">발송 완료</option>
+                <option value="skipped">건너뜀</option>
+                <option value="failed">발송 실패</option>
+              </select>
+            </label>
+          </div>
+          <div class="subtle" id="scheduleRunFilterMeta">예약 실행 이력을 불러오는 중입니다.</div>
+          <div class="saved-preset-actions" style="justify-content: flex-start; margin-top: 10px;">
+            <button id="downloadScheduleRunsCsvBtn" class="ghost-btn" type="button">현재 보기 CSV 저장</button>
+          </div>
           <div class="saved-preset-actions" id="scheduleRunFilterBar" style="justify-content: flex-start;" hidden></div>
           <div class="log-list" id="scheduleRunList">
             <span class="subtle">예약 실행 이력을 불러오는 중입니다.</span>
+          </div>
+          <div class="section-head" style="margin-top: 16px;">
+            <div>
+              <h3 style="margin-bottom: 4px;">최근 발송 로그</h3>
+              <div class="subtle">수신자별 발송 성공/실패 결과와 스냅샷 재사용 흐름을 확인합니다.</div>
+            </div>
+          </div>
+          <div class="saved-preset-row">
+            <label>
+              발송 로그 찾기
+              <input id="sendLogSearchInput" type="text" placeholder="수신자, 제목, 키워드로 찾기">
+            </label>
+            <label>
+              발송 상태
+              <select id="sendLogStatusSelect">
+                <option value="all">전체</option>
+                <option value="sent">발송 완료</option>
+                <option value="failed">발송 실패</option>
+              </select>
+            </label>
+          </div>
+          <div class="subtle" id="sendLogFilterMeta">발송 로그를 불러오는 중입니다.</div>
+          <div class="saved-preset-actions" style="justify-content: flex-start; margin-top: 10px;">
+            <button id="downloadSendLogsCsvBtn" class="ghost-btn" type="button">현재 보기 CSV 저장</button>
           </div>
           <div class="log-list" id="sendLogList">
             <span class="subtle">발송 로그를 불러오는 중입니다.</span>
@@ -970,12 +1085,18 @@ export function buildNewsletterAppHtml(): string {
       recipientGroups: [],
       subscriptionTemplates: [],
       subscriptionActivityById: {},
+      subscriptionFilterText: "",
+      subscriptionFilterStatus: "all",
       scheduleJobs: [],
       scheduleRunLogs: [],
       scheduleRunFilterJobId: "",
+      scheduleRunFilterText: "",
+      scheduleRunFilterStatus: "all",
       operationalSummary: null,
       recipients: [],
       sendLogs: [],
+      sendLogFilterText: "",
+      sendLogFilterStatus: "all",
     };
 
     const keywordInput = document.getElementById("keywordInput");
@@ -996,16 +1117,28 @@ export function buildNewsletterAppHtml(): string {
     const groupNameInput = document.getElementById("groupNameInput");
     const savedRecipientGroupList = document.getElementById("savedRecipientGroupList");
     const subscriptionRecipientGroupSelect = document.getElementById("subscriptionRecipientGroupSelect");
+    const settingsImportInput = document.getElementById("settingsImportInput");
     const scheduleAtInput = document.getElementById("scheduleAtInput");
     const scheduleRecurrenceSelect = document.getElementById("scheduleRecurrenceSelect");
     const schedulePresetSelect = document.getElementById("schedulePresetSelect");
     const scheduleOnlyNewInput = document.getElementById("scheduleOnlyNewInput");
     const subscriptionNameInput = document.getElementById("subscriptionNameInput");
+    const subscriptionFilterInput = document.getElementById("subscriptionFilterInput");
+    const subscriptionFilterSelect = document.getElementById("subscriptionFilterSelect");
+    const subscriptionFilterMeta = document.getElementById("subscriptionFilterMeta");
     const savedSubscriptionList = document.getElementById("savedSubscriptionList");
     const scheduleList = document.getElementById("scheduleList");
+    const scheduleRunSearchInput = document.getElementById("scheduleRunSearchInput");
+    const scheduleRunStatusSelect = document.getElementById("scheduleRunStatusSelect");
+    const scheduleRunFilterMeta = document.getElementById("scheduleRunFilterMeta");
+    const downloadScheduleRunsCsvBtn = document.getElementById("downloadScheduleRunsCsvBtn");
     const scheduleRunFilterBar = document.getElementById("scheduleRunFilterBar");
     const scheduleRunList = document.getElementById("scheduleRunList");
     const operationalSummaryGrid = document.getElementById("operationalSummaryGrid");
+    const sendLogSearchInput = document.getElementById("sendLogSearchInput");
+    const sendLogStatusSelect = document.getElementById("sendLogStatusSelect");
+    const sendLogFilterMeta = document.getElementById("sendLogFilterMeta");
+    const downloadSendLogsCsvBtn = document.getElementById("downloadSendLogsCsvBtn");
     const sendLogList = document.getElementById("sendLogList");
     const subjectInput = document.getElementById("subjectInput");
     const introInput = document.getElementById("introInput");
@@ -1029,6 +1162,12 @@ export function buildNewsletterAppHtml(): string {
     pageSizeSelect.value = String(state.query.pageSize);
     scheduleAtInput.value = getDefaultScheduleAtValue();
     scheduleRecurrenceSelect.value = "once";
+    subscriptionFilterInput.value = "";
+    subscriptionFilterSelect.value = state.subscriptionFilterStatus;
+    scheduleRunSearchInput.value = "";
+    scheduleRunStatusSelect.value = state.scheduleRunFilterStatus;
+    sendLogSearchInput.value = "";
+    sendLogStatusSelect.value = state.sendLogFilterStatus;
     renderRecipients();
     renderRecipientGroups();
     renderSubscriptionTemplates();
@@ -1071,6 +1210,22 @@ export function buildNewsletterAppHtml(): string {
       await saveSearchPreset();
     });
 
+    document.getElementById("exportSettingsBtn").addEventListener("click", async () => {
+      await exportSettingsBundle();
+    });
+
+    document.getElementById("importSettingsBtn").addEventListener("click", () => {
+      settingsImportInput.click();
+    });
+
+    settingsImportInput.addEventListener("change", async () => {
+      const file = settingsImportInput.files && settingsImportInput.files[0];
+      if (!file) {
+        return;
+      }
+      await importSettingsBundle(file);
+    });
+
     keywordInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -1083,6 +1238,44 @@ export function buildNewsletterAppHtml(): string {
         event.preventDefault();
         await saveSearchPreset();
       }
+    });
+
+    subscriptionFilterInput.addEventListener("input", () => {
+      state.subscriptionFilterText = subscriptionFilterInput.value || "";
+      renderSubscriptionTemplates();
+    });
+
+    subscriptionFilterSelect.addEventListener("change", () => {
+      state.subscriptionFilterStatus = subscriptionFilterSelect.value || "all";
+      renderSubscriptionTemplates();
+    });
+
+    scheduleRunSearchInput.addEventListener("input", () => {
+      state.scheduleRunFilterText = scheduleRunSearchInput.value || "";
+      renderScheduleRuns();
+    });
+
+    scheduleRunStatusSelect.addEventListener("change", () => {
+      state.scheduleRunFilterStatus = scheduleRunStatusSelect.value || "all";
+      renderScheduleRuns();
+    });
+
+    sendLogSearchInput.addEventListener("input", () => {
+      state.sendLogFilterText = sendLogSearchInput.value || "";
+      renderSendLogs();
+    });
+
+    sendLogStatusSelect.addEventListener("change", () => {
+      state.sendLogFilterStatus = sendLogStatusSelect.value || "all";
+      renderSendLogs();
+    });
+
+    downloadScheduleRunsCsvBtn.addEventListener("click", async () => {
+      await downloadScheduleRunsCsv();
+    });
+
+    downloadSendLogsCsvBtn.addEventListener("click", async () => {
+      await downloadSendLogsCsv();
     });
 
     ["input", "change"].forEach((eventName) => {
@@ -1286,21 +1479,43 @@ export function buildNewsletterAppHtml(): string {
     }
 
     function renderSubscriptionTemplates() {
-      if (!state.subscriptionTemplates.length) {
+      const totalCount = state.subscriptionTemplates.length;
+      if (!totalCount) {
+        subscriptionFilterMeta.textContent = "저장된 구독 템플릿이 없습니다.";
         savedSubscriptionList.innerHTML = '<span class="subtle">저장된 구독 템플릿이 없습니다.</span>';
         return;
       }
 
-      savedSubscriptionList.innerHTML = state.subscriptionTemplates.map((subscription) => {
+      const filteredSubscriptions = state.subscriptionTemplates.filter((subscription) => {
+        return matchesSubscriptionTemplateFilter(subscription);
+      });
+      subscriptionFilterMeta.textContent = getSubscriptionFilterMetaText(filteredSubscriptions.length, totalCount);
+
+      if (!filteredSubscriptions.length) {
+        savedSubscriptionList.innerHTML = '<span class="subtle">조건에 맞는 구독 템플릿이 없습니다.</span>';
+        return;
+      }
+
+      savedSubscriptionList.innerHTML = filteredSubscriptions.map((subscription) => {
+        const activity = state.subscriptionActivityById[subscription.id];
+        const activityStatus = getSubscriptionActivityStatus(activity);
+        const latestSnapshotButtons = activity && activity.latestSnapshotJobId
+          ? '<button type="button" class="ghost-btn" data-open-subscription-html="' + escapeHtml(activity.latestSnapshotJobId) + '">최근 발송 HTML</button>' +
+            '<button type="button" class="ghost-btn" data-download-subscription-markdown="' + escapeHtml(activity.latestSnapshotJobId) + '">최근 발송 Markdown</button>'
+          : "";
         return '<div class="saved-preset-item">' +
           '<div>' +
+          '<div class="saved-preset-head">' +
           '<strong>' + escapeHtml(subscription.name) + '</strong>' +
+          '<span class="status-badge ' + escapeHtml(activityStatus.tone) + '">' + escapeHtml(activityStatus.label) + '</span>' +
+          '</div>' +
           '<div class="saved-preset-meta">' + escapeHtml(getSubscriptionSummary(subscription)) + '</div>' +
           '</div>' +
           '<div class="saved-preset-actions">' +
           '<button type="button" class="ghost-btn" data-load-subscription="' + escapeHtml(subscription.id) + '">불러오기</button>' +
           '<button type="button" class="ghost-btn" data-send-subscription="' + escapeHtml(subscription.id) + '">즉시 발송</button>' +
           '<button type="button" class="ghost-btn" data-download-subscription="' + escapeHtml(subscription.id) + '">Markdown 저장</button>' +
+          latestSnapshotButtons +
           '<button type="button" class="ghost-btn" data-schedule-subscription="' + escapeHtml(subscription.id) + '">현재 시각으로 예약</button>' +
           '<button type="button" class="danger-btn" data-delete-subscription="' + escapeHtml(subscription.id) + '">삭제</button>' +
           '</div>' +
@@ -1322,6 +1537,18 @@ export function buildNewsletterAppHtml(): string {
       savedSubscriptionList.querySelectorAll("button[data-download-subscription]").forEach((button) => {
         button.addEventListener("click", async () => {
           await downloadSubscriptionMarkdown(button.dataset.downloadSubscription);
+        });
+      });
+
+      savedSubscriptionList.querySelectorAll("button[data-open-subscription-html]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await openSendLogHtml(button.dataset.openSubscriptionHtml);
+        });
+      });
+
+      savedSubscriptionList.querySelectorAll("button[data-download-subscription-markdown]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await downloadSendLogMarkdown(button.dataset.downloadSubscriptionMarkdown);
         });
       });
 
@@ -1370,6 +1597,86 @@ export function buildNewsletterAppHtml(): string {
         ", 일시정지 " + String(activity.pausedScheduleCount) +
         ", 실패 " + String(activity.failedScheduleCount) +
         ") · " + latestLabel;
+    }
+
+    function matchesSubscriptionTemplateFilter(subscription) {
+      const filterText = (state.subscriptionFilterText || "").trim().toLowerCase();
+      if (filterText) {
+        const haystack = [
+          subscription.name,
+          subscription.subject,
+          subscription.query && subscription.query.keyword,
+          subscription.searchPresetName,
+          subscription.recipientGroupName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        if (!haystack.includes(filterText)) {
+          return false;
+        }
+      }
+
+      const filterStatus = state.subscriptionFilterStatus || "all";
+      if (filterStatus === "all") {
+        return true;
+      }
+
+      const activityStatus = getSubscriptionActivityStatus(state.subscriptionActivityById[subscription.id]);
+      if (filterStatus === "attention") {
+        return activityStatus.key === "failed" || activityStatus.key === "paused";
+      }
+
+      if (filterStatus === "active") {
+        return activityStatus.key === "active";
+      }
+
+      if (filterStatus === "history") {
+        return activityStatus.key === "history";
+      }
+
+      if (filterStatus === "no_schedule") {
+        return activityStatus.key === "no_schedule";
+      }
+
+      return true;
+    }
+
+    function getSubscriptionActivityStatus(activity) {
+      if (!activity || activity.scheduleCount === 0) {
+        return { key: "no_schedule", label: "예약 없음", tone: "muted" };
+      }
+
+      if (activity.failedScheduleCount > 0) {
+        return { key: "failed", label: "실패 있음", tone: "danger" };
+      }
+
+      if (activity.pausedScheduleCount > 0) {
+        return { key: "paused", label: "일시정지", tone: "warning" };
+      }
+
+      if (activity.activeScheduleCount > 0) {
+        return { key: "active", label: "활성", tone: "active" };
+      }
+
+      return { key: "history", label: "이력만", tone: "muted" };
+    }
+
+    function getSubscriptionFilterMetaText(visibleCount, totalCount) {
+      const statusLabel = getSubscriptionFilterStatusLabel(state.subscriptionFilterStatus || "all");
+      if (!totalCount) {
+        return "저장된 구독 템플릿이 없습니다.";
+      }
+      return "표시 중 " + String(visibleCount) + " / " + String(totalCount) + "개 · 상태 " + statusLabel;
+    }
+
+    function getSubscriptionFilterStatusLabel(value) {
+      if (value === "active") return "활성 예약 있음";
+      if (value === "attention") return "주의 필요";
+      if (value === "history") return "이력만 있음";
+      if (value === "no_schedule") return "예약 없음";
+      return "전체";
     }
 
     function applyQuerySnapshot(query, options) {
@@ -1581,6 +1888,89 @@ export function buildNewsletterAppHtml(): string {
       previewSummary.textContent = item.summary || "상세 요약 정보가 아직 수집되지 않았습니다.";
       previewLink.href = item.detailUrl || "#";
       previewLink.textContent = item.detailUrl ? "원문 보기" : "원문 링크 없음";
+    }
+
+    async function exportSettingsBundle() {
+      try {
+        const response = await fetch("/api/newsletter/settings-export");
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "설정 백업 파일을 생성하지 못했습니다.");
+        }
+
+        const blob = await response.blob();
+        const disposition = response.headers.get("Content-Disposition") || "";
+        const match = disposition.match(/filename="([^"]+)"/);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = match ? match[1] : "newsletter-settings-backup.json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setStatus(composerStatus, "설정 백업 파일을 내려받았습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "설정 백업 파일을 생성하지 못했습니다.", "error");
+      }
+    }
+
+    async function importSettingsBundle(file) {
+      try {
+        if (!file) {
+          return;
+        }
+
+        const shouldImport = window.confirm(
+          "현재 저장된 수신자, 수신자 그룹, 검색 preset, 구독 템플릿을 백업 파일 내용으로 교체합니다. 계속할까요?",
+        );
+        if (!shouldImport) {
+          return;
+        }
+
+        let bundle;
+        try {
+          bundle = JSON.parse(await file.text());
+        } catch {
+          throw new Error("설정 백업 파일 JSON을 해석하지 못했습니다.");
+        }
+
+        const response = await fetch("/api/newsletter/settings-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bundle),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "설정 복원에 실패했습니다.");
+        }
+
+        await reloadStoredNewsletterSettings();
+        const counts = data.counts || {};
+        setStatus(
+          composerStatus,
+          "설정 복원을 완료했습니다. 수신자 " + String(counts.recipients || 0) +
+            "명, 그룹 " + String(counts.recipientGroups || 0) +
+            "개, preset " + String(counts.searchPresets || 0) +
+            "개, 구독 템플릿 " + String(counts.subscriptionTemplates || 0) + "개를 반영했습니다.",
+          "success",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "설정 복원에 실패했습니다.", "error");
+      } finally {
+        settingsImportInput.value = "";
+      }
+    }
+
+    async function reloadStoredNewsletterSettings() {
+      await Promise.all([
+        loadRecipients(),
+        loadRecipientGroups(),
+        loadSearchPresets(),
+        loadSubscriptionTemplates(),
+        loadSubscriptionActivities(),
+        loadOperationalSummary(),
+      ]);
     }
 
     async function addRecipient() {
@@ -1813,15 +2203,24 @@ export function buildNewsletterAppHtml(): string {
     }
 
     function renderSendLogs() {
+      const filteredLogs = state.sendLogs.filter((log) => matchesSendLogFilter(log));
+      sendLogFilterMeta.textContent = getSendLogFilterMetaText(filteredLogs.length, state.sendLogs.length);
+
       if (!state.sendLogs.length) {
         sendLogList.innerHTML = '<span class="subtle">아직 발송 로그가 없습니다.</span>';
         return;
       }
 
-      sendLogList.innerHTML = state.sendLogs.map((log) => {
+      if (!filteredLogs.length) {
+        sendLogList.innerHTML = '<span class="subtle">조건에 맞는 발송 로그가 없습니다.</span>';
+        return;
+      }
+
+      sendLogList.innerHTML = filteredLogs.map((log) => {
         const tone = log.status === "failed" ? "failed" : "sent";
-        const label = log.status === "failed" ? "발송 실패" : "발송 완료";
+        const label = getSendLogStatusLabel(log.status);
         const detail = log.errorMessage ? '<div class="log-meta">' + escapeHtml(log.errorMessage) + '</div>' : '';
+        const keywordMeta = log.keyword ? ' · 키워드 ' + escapeHtml(log.keyword) : '';
         const actions = log.snapshotAvailable
           ? '<div class="saved-preset-actions" style="justify-content: flex-start;">' +
               '<button type="button" class="ghost-btn" data-open-log-html="' + escapeHtml(log.jobId) + '">HTML 보기</button>' +
@@ -1834,7 +2233,8 @@ export function buildNewsletterAppHtml(): string {
           : '<div class="log-meta">발송 스냅샷이 없습니다.</div>';
         return '<div class="log-item">' +
           '<strong>' + escapeHtml(log.subject || "입법예고 뉴스레터") + '</strong>' +
-          '<div class="log-meta">수신자 ' + escapeHtml(log.recipientEmail) + ' · 법안 ' + escapeHtml(String(log.itemCount || 0)) + '건 · ' + escapeHtml(log.sentAt || "") + '</div>' +
+          '<div class="log-meta">수신자 ' + escapeHtml(log.recipientEmail) + keywordMeta +
+            ' · 법안 ' + escapeHtml(String(log.itemCount || 0)) + '건 · ' + escapeHtml(log.sentAt || "") + '</div>' +
           '<div class="log-status ' + tone + '">' + label + '</div>' +
           detail +
           actions +
@@ -1864,6 +2264,50 @@ export function buildNewsletterAppHtml(): string {
           await resendSendLog(button.dataset.resendLog);
         });
       });
+    }
+
+    function matchesSendLogFilter(log) {
+      const filterText = (state.sendLogFilterText || "").trim().toLowerCase();
+      if (filterText) {
+        const haystack = [
+          log.recipientEmail,
+          log.subject,
+          log.keyword,
+          log.errorMessage,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        if (!haystack.includes(filterText)) {
+          return false;
+        }
+      }
+
+      const filterStatus = state.sendLogFilterStatus || "all";
+      if (filterStatus !== "all" && log.status !== filterStatus) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function getSendLogFilterMetaText(visibleCount, totalCount) {
+      const statusLabel = getSendLogFilterStatusLabel(state.sendLogFilterStatus || "all");
+      if (!totalCount) {
+        return "발송 로그가 없습니다.";
+      }
+      return "표시 중 " + String(visibleCount) + " / " + String(totalCount) + "건 · 상태 " + statusLabel;
+    }
+
+    function getSendLogStatusLabel(value) {
+      return value === "failed" ? "발송 실패" : "발송 완료";
+    }
+
+    function getSendLogFilterStatusLabel(value) {
+      if (value === "failed") return "발송 실패";
+      if (value === "sent") return "발송 완료";
+      return "전체";
     }
 
     function renderOperationalSummary() {
@@ -2019,6 +2463,8 @@ export function buildNewsletterAppHtml(): string {
 
     function renderScheduleRuns() {
       renderScheduleRunFilterBar();
+      const filteredRuns = state.scheduleRunLogs.filter((run) => matchesScheduleRunFilter(run));
+      scheduleRunFilterMeta.textContent = getScheduleRunFilterMetaText(filteredRuns.length, state.scheduleRunLogs.length);
 
       if (!state.scheduleRunLogs.length) {
         scheduleRunList.innerHTML = '<span class="subtle">' +
@@ -2031,7 +2477,12 @@ export function buildNewsletterAppHtml(): string {
         return;
       }
 
-      scheduleRunList.innerHTML = state.scheduleRunLogs.map((run) => {
+      if (!filteredRuns.length) {
+        scheduleRunList.innerHTML = '<span class="subtle">조건에 맞는 예약 실행 이력이 없습니다.</span>';
+        return;
+      }
+
+      scheduleRunList.innerHTML = filteredRuns.map((run) => {
         const statusLabel = getScheduleRunResultLabel(run.status);
         const statusTone = run.status === "failed"
           ? "failed"
@@ -2096,6 +2547,50 @@ export function buildNewsletterAppHtml(): string {
           await clearScheduleRunFilter();
         });
       });
+    }
+
+    function matchesScheduleRunFilter(run) {
+      const filterText = (state.scheduleRunFilterText || "").trim().toLowerCase();
+      if (filterText) {
+        const haystack = [
+          run.scheduleSubject,
+          run.keyword,
+          run.message,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        if (!haystack.includes(filterText)) {
+          return false;
+        }
+      }
+
+      const filterStatus = state.scheduleRunFilterStatus || "all";
+      if (filterStatus !== "all" && run.status !== filterStatus) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function getScheduleRunFilterMetaText(visibleCount, totalCount) {
+      const statusLabel = getScheduleRunFilterStatusLabel(state.scheduleRunFilterStatus || "all");
+      if (!totalCount) {
+        return state.scheduleRunFilterJobId
+          ? "선택한 예약의 실행 이력이 아직 없습니다."
+          : "예약 실행 이력이 없습니다.";
+      }
+
+      const jobLabel = state.scheduleRunFilterJobId ? " · 예약별 보기 적용 중" : "";
+      return "표시 중 " + String(visibleCount) + " / " + String(totalCount) + "건 · 상태 " + statusLabel + jobLabel;
+    }
+
+    function getScheduleRunFilterStatusLabel(value) {
+      if (value === "sent") return "발송 완료";
+      if (value === "skipped") return "건너뜀";
+      if (value === "failed") return "발송 실패";
+      return "전체";
     }
 
     function formatScheduledAt(value) {
@@ -2194,25 +2689,75 @@ export function buildNewsletterAppHtml(): string {
           throw new Error("내려받을 발송 로그 jobId가 없습니다.");
         }
         const response = await fetch("/api/newsletter/send-log-artifact?jobId=" + encodeURIComponent(jobId) + "&format=markdown");
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || "발송 Markdown 스냅샷을 불러오지 못했습니다.");
-        }
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        const disposition = response.headers.get("Content-Disposition") || "";
-        const match = disposition.match(/filename="([^"]+)"/);
-        link.href = url;
-        link.download = match ? match[1] : "sent-newsletter.md";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+        await downloadResponseFile(response, "sent-newsletter.md", "발송 Markdown 스냅샷을 불러오지 못했습니다.");
         setStatus(composerStatus, "발송 Markdown 스냅샷을 내려받았습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "발송 Markdown 스냅샷을 불러오지 못했습니다.", "error");
       }
+    }
+
+    async function downloadSendLogsCsv() {
+      try {
+        const params = new URLSearchParams({ limit: "500" });
+        if ((state.sendLogFilterText || "").trim()) {
+          params.set("text", state.sendLogFilterText.trim());
+        }
+        if ((state.sendLogFilterStatus || "all") !== "all") {
+          params.set("status", state.sendLogFilterStatus);
+        }
+
+        const response = await fetch("/api/newsletter/send-logs-export?" + params.toString());
+        await downloadResponseFile(response, "send-logs.csv", "발송 로그 CSV를 생성하지 못했습니다.");
+        setStatus(composerStatus, "현재 발송 로그 CSV를 내려받았습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "발송 로그 CSV를 생성하지 못했습니다.", "error");
+      }
+    }
+
+    async function downloadScheduleRunsCsv() {
+      try {
+        const params = new URLSearchParams({ limit: "500" });
+        if (state.scheduleRunFilterJobId) {
+          params.set("scheduleJobId", state.scheduleRunFilterJobId);
+        }
+        if ((state.scheduleRunFilterText || "").trim()) {
+          params.set("text", state.scheduleRunFilterText.trim());
+        }
+        if ((state.scheduleRunFilterStatus || "all") !== "all") {
+          params.set("status", state.scheduleRunFilterStatus);
+        }
+
+        const response = await fetch("/api/newsletter/schedule-runs-export?" + params.toString());
+        await downloadResponseFile(response, "schedule-runs.csv", "예약 실행 이력 CSV를 생성하지 못했습니다.");
+        setStatus(composerStatus, "현재 예약 실행 이력 CSV를 내려받았습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "예약 실행 이력 CSV를 생성하지 못했습니다.", "error");
+      }
+    }
+
+    async function downloadResponseFile(response, fallbackFilename, errorMessage) {
+      if (!response.ok) {
+        let message = errorMessage;
+        try {
+          const data = await response.json();
+          message = data.error || message;
+        } catch {
+          message = errorMessage;
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      link.href = url;
+      link.download = match ? match[1] : fallbackFilename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     }
 
     async function resendSendLog(jobId) {
@@ -2931,6 +3476,7 @@ export function buildNewsletterAppHtml(): string {
         state.subscriptionTemplates = data.items || [];
         renderSubscriptionTemplates();
       } catch (error) {
+        subscriptionFilterMeta.textContent = error.message || "구독 템플릿 목록을 불러오지 못했습니다.";
         savedSubscriptionList.innerHTML = '<span class="subtle">' + escapeHtml(error.message || "구독 템플릿 목록을 불러오지 못했습니다.") + '</span>';
       }
     }
@@ -2953,6 +3499,7 @@ export function buildNewsletterAppHtml(): string {
         renderSubscriptionTemplates();
       } catch {
         state.subscriptionActivityById = {};
+        renderSubscriptionTemplates();
       }
     }
 
@@ -3003,6 +3550,7 @@ export function buildNewsletterAppHtml(): string {
         renderScheduleRuns();
         await loadSubscriptionActivities();
       } catch (error) {
+        scheduleRunFilterMeta.textContent = error.message || "예약 실행 이력을 불러오지 못했습니다.";
         scheduleRunList.innerHTML = '<span class="subtle">' + escapeHtml(error.message || "예약 실행 이력을 불러오지 못했습니다.") + '</span>';
       }
     }
@@ -3105,6 +3653,7 @@ export function buildNewsletterAppHtml(): string {
         state.sendLogs = data.items || [];
         renderSendLogs();
       } catch (error) {
+        sendLogFilterMeta.textContent = error.message || "발송 로그를 불러오지 못했습니다.";
         sendLogList.innerHTML = '<span class="subtle">' + escapeHtml(error.message || "발송 로그를 불러오지 못했습니다.") + '</span>';
       }
     }

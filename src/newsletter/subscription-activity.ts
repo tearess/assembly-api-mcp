@@ -26,6 +26,7 @@ export function buildNewsletterSubscriptionActivity(
   }
 
   const latestRunBySubscriptionId = new Map<string, ScheduledNewsletterRunRecord>();
+  const latestSnapshotRunBySubscriptionId = new Map<string, ScheduledNewsletterRunRecord>();
   for (const run of runs) {
     const subscriptionId = subscriptionIdByJobId.get(run.scheduleJobId);
     if (!subscriptionId) {
@@ -36,11 +37,21 @@ export function buildNewsletterSubscriptionActivity(
     if (!current || compareRunOrder(run, current) > 0) {
       latestRunBySubscriptionId.set(subscriptionId, run);
     }
+
+    if (run.status !== "sent" || !run.deliveryJobId) {
+      continue;
+    }
+
+    const snapshotRun = latestSnapshotRunBySubscriptionId.get(subscriptionId);
+    if (!snapshotRun || compareRunOrder(run, snapshotRun) > 0) {
+      latestSnapshotRunBySubscriptionId.set(subscriptionId, run);
+    }
   }
 
   return subscriptions.map((subscription) => {
     const linkedJobs = jobsBySubscriptionId.get(subscription.id) ?? [];
     const latestRun = latestRunBySubscriptionId.get(subscription.id) ?? null;
+    const latestSnapshotRun = latestSnapshotRunBySubscriptionId.get(subscription.id) ?? null;
 
     return {
       subscriptionId: subscription.id,
@@ -51,6 +62,8 @@ export function buildNewsletterSubscriptionActivity(
       latestRunStatus: latestRun?.status ?? null,
       latestRunAt: latestRun?.runAt ?? null,
       latestRunMessage: latestRun?.message ?? null,
+      latestSnapshotJobId: latestSnapshotRun?.deliveryJobId ?? null,
+      latestSnapshotAt: latestSnapshotRun?.runAt ?? null,
     };
   });
 }

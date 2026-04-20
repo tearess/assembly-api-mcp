@@ -11,6 +11,8 @@ import {
 import { createLegislationEnrichmentService } from "../newsletter/legislation-enricher.js";
 import { createLegislationSearchService } from "../newsletter/legislation-search.js";
 import {
+  exportNewsletterSettingsBundle,
+  importNewsletterSettingsBundle,
   NewsletterSubscriptionStore,
   RecipientGroupStore,
   RecipientStore,
@@ -22,6 +24,12 @@ import {
 } from "../newsletter/persistence.js";
 import { buildNewsletterSubscriptionActivity } from "../newsletter/subscription-activity.js";
 import { buildNewsletterOperationalSummary } from "../newsletter/summary.js";
+import {
+  filterScheduleRuns,
+  filterSendLogs,
+  renderScheduleRunsCsv,
+  renderSendLogsCsv,
+} from "../newsletter/log-export.js";
 import {
   buildMarkdownFilename,
   renderNewsletterMarkdown,
@@ -159,6 +167,28 @@ export async function handleNewsletterRequest(
     return true;
   }
 
+  if (req.method === "GET" && pathname === "/api/newsletter/send-logs-export") {
+    try {
+      const store = new SendLogStore();
+      const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "500", 10);
+      const logs = await store.list(Number.isInteger(limit) ? limit : 500);
+      const filtered = filterSendLogs(logs, {
+        text: requestUrl.searchParams.get("text"),
+        status: toSendLogStatus(requestUrl.searchParams.get("status")),
+      });
+
+      sendText(res, 200, renderSendLogsCsv(filtered), {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${buildExportFilename("send-logs")}"`,
+      });
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
   if (req.method === "GET" && pathname === "/api/newsletter/summary") {
     try {
       const [
@@ -190,6 +220,42 @@ export async function handleNewsletterRequest(
       }));
     } catch (error: unknown) {
       sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/newsletter/settings-export") {
+    try {
+      const bundle = await exportNewsletterSettingsBundle();
+      sendText(res, 200, JSON.stringify(bundle, null, 2) + "\n", {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${buildSettingsBackupFilename(bundle.exportedAt)}"`,
+      });
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/newsletter/settings-import") {
+    try {
+      const body = await readJsonBody(req);
+      const bundle = await importNewsletterSettingsBundle(body);
+      sendJson(res, 200, {
+        importedAt: bundle.exportedAt,
+        counts: {
+          recipients: bundle.recipients.length,
+          recipientGroups: bundle.recipientGroups.length,
+          searchPresets: bundle.searchPresets.length,
+          subscriptionTemplates: bundle.subscriptionTemplates.length,
+        },
+      });
+    } catch (error: unknown) {
+      sendJson(res, 400, {
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -313,6 +379,33 @@ export async function handleNewsletterRequest(
           Number.isInteger(limit) ? limit : 20,
           scheduleJobId,
         ),
+      });
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/newsletter/schedule-runs-export") {
+    try {
+      const store = new ScheduledNewsletterRunStore();
+      const limit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "500", 10);
+      const scheduleJobId = requestUrl.searchParams.get("scheduleJobId");
+      const runs = await store.list(
+        Number.isInteger(limit) ? limit : 500,
+        scheduleJobId,
+      );
+      const filtered = filterScheduleRuns(runs, {
+        scheduleJobId,
+        text: requestUrl.searchParams.get("text"),
+        status: toScheduleRunStatus(requestUrl.searchParams.get("status")),
+      });
+
+      sendText(res, 200, renderScheduleRunsCsv(filtered), {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${buildExportFilename("schedule-runs")}"`,
       });
     } catch (error: unknown) {
       sendJson(res, 500, {
@@ -629,6 +722,24 @@ function toScheduledRecurrence(value: unknown): ScheduledNewsletterRecurrence {
     return value;
   }
   return "once";
+}
+
+function buildSettingsBackupFilename(exportedAt: string): string {
+  const compact = exportedAt.replaceAll(/[^0-9]/g, "").slice(0, 14);
+  return `newsletter-settings-${compact || "backup"}.json`;
+}
+
+function buildExportFilename(prefix: string): string {
+  const stamp = new Date().toISOString().replaceAll(/[-:TZ.]/g, "").slice(0, 14);
+  return `${prefix}-${stamp || "export"}.csv`;
+}
+
+function toSendLogStatus(value: string | null): "sent" | "failed" | "all" {
+  return value === "sent" || value === "failed" ? value : "all";
+}
+
+function toScheduleRunStatus(value: string | null): "sent" | "failed" | "skipped" | "all" {
+  return value === "sent" || value === "failed" || value === "skipped" ? value : "all";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

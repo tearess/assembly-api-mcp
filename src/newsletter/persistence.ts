@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import {
   type NewsletterSendPayload,
   type NewsletterDocument,
+  type NewsletterSettingsBundle,
   type RecipientGroupRecord,
   type RecipientRecord,
   type ScheduledNewsletterRunRecord,
@@ -27,6 +28,7 @@ const SEARCH_PRESETS_FILE = "search-presets.json";
 const NEWSLETTER_SUBSCRIPTIONS_FILE = "newsletter-subscriptions.json";
 const SCHEDULED_JOBS_FILE = "scheduled-jobs.json";
 const SENT_SNAPSHOTS_DIR = "sent-newsletters";
+const SETTINGS_BUNDLE_VERSION = 1;
 
 export function resolveNewsletterDataDir(
   env: NodeJS.ProcessEnv = process.env,
@@ -36,6 +38,54 @@ export function resolveNewsletterDataDir(
     return resolve(override);
   }
   return resolve(process.cwd(), DEFAULT_DATA_DIR);
+}
+
+export async function exportNewsletterSettingsBundle(
+  dataDir: string = resolveNewsletterDataDir(),
+): Promise<NewsletterSettingsBundle> {
+  const [recipients, recipientGroups, searchPresets, subscriptionTemplates] = await Promise.all([
+    new RecipientStore(dataDir).list(),
+    new RecipientGroupStore(dataDir).list(),
+    new SearchPresetStore(dataDir).list(),
+    new NewsletterSubscriptionStore(dataDir).list(),
+  ]);
+
+  return {
+    version: SETTINGS_BUNDLE_VERSION,
+    exportedAt: formatNowKst(),
+    recipients,
+    recipientGroups,
+    searchPresets,
+    subscriptionTemplates,
+  };
+}
+
+export async function importNewsletterSettingsBundle(
+  input: unknown,
+  dataDir: string = resolveNewsletterDataDir(),
+): Promise<NewsletterSettingsBundle> {
+  const bundle = normalizeNewsletterSettingsBundle(input);
+
+  await Promise.all([
+    writeJsonArray(
+      resolve(dataDir, RECIPIENTS_FILE),
+      dedupeRecipients(bundle.recipients),
+    ),
+    writeJsonArray(
+      resolve(dataDir, RECIPIENT_GROUPS_FILE),
+      dedupeRecordsById(bundle.recipientGroups),
+    ),
+    writeJsonArray(
+      resolve(dataDir, SEARCH_PRESETS_FILE),
+      dedupeRecordsById(bundle.searchPresets),
+    ),
+    writeJsonArray(
+      resolve(dataDir, NEWSLETTER_SUBSCRIPTIONS_FILE),
+      dedupeRecordsById(bundle.subscriptionTemplates),
+    ),
+  ]);
+
+  return bundle;
 }
 
 export class RecipientStore {
@@ -853,6 +903,20 @@ function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function normalizeRecipientRecord(item: RecipientRecord): RecipientRecord {
+  const email = normalizeEmail(item.email);
+  if (!email) {
+    throw new Error("수신자 이메일이 필요합니다.");
+  }
+
+  const createdAt = normalizeOptionalText(item.createdAt) ?? formatNowKst();
+  return {
+    email,
+    createdAt,
+    updatedAt: normalizeOptionalText(item.updatedAt) ?? createdAt,
+  };
+}
+
 function normalizeRecipientGroupRecord(item: RecipientGroupRecord): RecipientGroupRecord {
   const createdAt = normalizeOptionalText(item.createdAt) ?? formatNowKst();
 
@@ -934,6 +998,20 @@ function normalizePresetName(value: string): string {
   return normalized;
 }
 
+function normalizeSavedSearchPresetRecord(
+  item: SavedSearchPresetRecord,
+): SavedSearchPresetRecord {
+  const createdAt = normalizeOptionalText(item.createdAt) ?? formatNowKst();
+
+  return {
+    id: normalizeOptionalText(item.id) ?? randomUUID(),
+    name: normalizePresetName(item.name),
+    query: normalizeSavedSearchPresetQuery(item.query),
+    createdAt,
+    updatedAt: normalizeOptionalText(item.updatedAt) ?? createdAt,
+  };
+}
+
 function normalizeSavedSearchPresetQuery(
   query: SavedSearchPresetQuery,
 ): SavedSearchPresetQuery {
@@ -984,10 +1062,76 @@ function normalizeNewsletterSubscriptionRecord(
   };
 }
 
+function normalizeNewsletterSettingsBundle(
+  input: unknown,
+): NewsletterSettingsBundle {
+  if (!isRecord(input)) {
+    throw new Error("설정 백업 파일 형식이 올바르지 않습니다.");
+  }
+
+  const version = input["version"];
+  if (version !== SETTINGS_BUNDLE_VERSION) {
+    throw new Error("지원하지 않는 설정 백업 파일 버전입니다.");
+  }
+
+  return {
+    version: SETTINGS_BUNDLE_VERSION,
+    exportedAt: normalizeOptionalText(asOptionalString(input["exportedAt"])) ?? formatNowKst(),
+    recipients: readBundleArray(input["recipients"], "recipients")
+      .map((item) => normalizeRecipientRecord(item as unknown as RecipientRecord)),
+    recipientGroups: readBundleArray(input["recipientGroups"], "recipientGroups")
+      .map((item) => normalizeRecipientGroupRecord(item as unknown as RecipientGroupRecord)),
+    searchPresets: readBundleArray(input["searchPresets"], "searchPresets")
+      .map((item) => normalizeSavedSearchPresetRecord(item as unknown as SavedSearchPresetRecord)),
+    subscriptionTemplates: readBundleArray(input["subscriptionTemplates"], "subscriptionTemplates")
+      .map((item) => normalizeNewsletterSubscriptionRecord(item as unknown as SavedNewsletterSubscriptionRecord)),
+  };
+}
+
 function normalizeOptionalText(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
   return normalized === "" ? null : normalized;
+}
+
+function asOptionalString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function readBundleArray(
+  value: unknown,
+  fieldName: string,
+): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`설정 백업 파일의 ${fieldName} 필드가 올바르지 않습니다.`);
+  }
+
+  return value.map((item) => {
+    if (!isRecord(item)) {
+      throw new Error(`설정 백업 파일의 ${fieldName} 항목 형식이 올바르지 않습니다.`);
+    }
+    return item;
+  });
+}
+
+function dedupeRecipients(items: readonly RecipientRecord[]): RecipientRecord[] {
+  const map = new Map<string, RecipientRecord>();
+  for (const item of items) {
+    map.set(item.email, normalizeRecipientRecord(item));
+  }
+  return Array.from(map.values()).sort((left, right) => left.email.localeCompare(right.email));
+}
+
+function dedupeRecordsById<T extends { readonly id: string }>(items: readonly T[]): T[] {
+  const map = new Map<string, T>();
+  for (const item of items) {
+    map.set(item.id, item);
+  }
+  return Array.from(map.values());
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function normalizeOptionalDate(value: string | null | undefined): string | null {
