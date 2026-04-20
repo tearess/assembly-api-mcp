@@ -3,7 +3,6 @@ import { type LegislationSearchQuery } from "./types.js";
 export function parseLegislationSearchQueryFromParams(
   params: URLSearchParams,
 ): LegislationSearchQuery {
-  const query: LegislationSearchQuery = {};
   const keyword = normalizeOptionalText(params.get("keyword"));
   const proposerFilter = normalizeOptionalText(params.get("proposer"));
   const committeeFilter = normalizeOptionalText(params.get("committee"));
@@ -15,18 +14,18 @@ export function parseLegislationSearchQueryFromParams(
   const page = normalizePositiveInt(params.get("page"));
   const pageSize = normalizePositiveInt(params.get("pageSize"));
 
-  if (keyword) query.keyword = keyword;
-  if (proposerFilter) query.proposerFilter = proposerFilter;
-  if (committeeFilter) query.committeeFilter = committeeFilter;
-  if (datePreset) query.datePreset = datePreset;
-  if (dateFrom) query.dateFrom = dateFrom;
-  if (dateTo) query.dateTo = dateTo;
-  if (noticeScope) query.noticeScope = noticeScope;
-  if (sortBy) query.sortBy = sortBy;
-  if (page) query.page = page;
-  if (pageSize) query.pageSize = pageSize;
-
-  return query;
+  return {
+    ...(keyword ? { keyword } : {}),
+    ...(proposerFilter ? { proposerFilter } : {}),
+    ...(committeeFilter ? { committeeFilter } : {}),
+    ...(datePreset ? { datePreset } : {}),
+    ...(dateFrom ? { dateFrom } : {}),
+    ...(dateTo ? { dateTo } : {}),
+    ...(noticeScope ? { noticeScope } : {}),
+    ...(sortBy ? { sortBy } : {}),
+    ...(page ? { page } : {}),
+    ...(pageSize ? { pageSize } : {}),
+  };
 }
 
 export function buildLegislationSearchQueryParams(
@@ -50,9 +49,9 @@ export function hasMeaningfulLegislationSearchQuery(
   query: LegislationSearchQuery,
 ): boolean {
   return Boolean(
-    normalizeOptionalText(query.keyword)
-      || normalizeOptionalText(query.proposerFilter)
-      || normalizeOptionalText(query.committeeFilter)
+    normalizeOptionalText(query.keyword ?? null)
+      || normalizeOptionalText(query.proposerFilter ?? null)
+      || normalizeOptionalText(query.committeeFilter ?? null)
       || normalizeDatePreset(query.datePreset ?? null)
       || normalizeOptionalDate(query.dateFrom ?? null)
       || normalizeOptionalDate(query.dateTo ?? null)

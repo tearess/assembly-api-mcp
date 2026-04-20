@@ -38,6 +38,8 @@ describe("newsletter/preview", () => {
       noticeStatusLabel: "입법예고 진행중",
       relevanceLabel: "매우 높음 (0.91)",
       summary: "인공지능 산업의 안전성 기준과 지원 근거를 정비하는 내용",
+      proposalReason: "인공지능 산업의 기반 조성과 안전성 기준 마련이 필요합니다.",
+      mainContent: "지원 근거를 명확히 하고 위험도 평가 체계를 신설합니다.",
     });
     expect(preview.sections).toEqual([
       {
@@ -66,6 +68,8 @@ describe("newsletter/preview", () => {
     expect(preview.summary).toBe("상세 요약 정보가 아직 수집되지 않았습니다.");
     expect(preview.noticeStatusLabel).toBe("입법예고 종료");
     expect(preview.relevanceLabel).toBe("낮음 (0.38)");
+    expect(preview.proposalReason).toBeNull();
+    expect(preview.mainContent).toBeNull();
     expect(preview.sections).toEqual([]);
   });
 });

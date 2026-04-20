@@ -18,6 +18,8 @@
     "start": "node dist/index.js",
     "dev": "node --import tsx src/index.ts",
     "cli": "node --import tsx src/cli.ts",
+    "vercel:check": "node scripts/vercel-check.mjs",
+    "vercel:env": "node scripts/vercel-env.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
@@ -40,6 +42,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
+    "@vercel/blob": "^2.3.3",
     "dotenv": "^16.4.7",
     "nodemailer": "^8.0.5"
   },

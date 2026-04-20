@@ -98,6 +98,11 @@ export function renderNewsletterHtml(
 </html>`;
 }
 
+export function buildHtmlFilename(document: NewsletterDocument): string {
+  const keyword = sanitizeFilename(document.keyword ?? "all");
+  return `legislation-newsletter_${keyword}_${document.dateFrom}_${document.dateTo}.html`;
+}
+
 function renderFilterMetaBoxes(document: NewsletterDocument): string {
   const boxes: string[] = [];
   if (document.proposerFilter) {
@@ -119,4 +124,8 @@ function escapeHtml(value: string): string {
 
 function escapeAttribute(value: string): string {
   return escapeHtml(value).replaceAll("'", "&#39;");
+}
+
+function sanitizeFilename(value: string): string {
+  return value.replace(/[^\p{L}\p{N}._-]+/gu, "_").replace(/^_+|_+$/g, "") || "all";
 }

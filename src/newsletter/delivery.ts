@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { type AppConfig } from "../config.js";
 import {
   SmtpNewsletterEmailSender,
+  buildNewsletterEmailAttachments,
   loadSmtpSettings,
   normalizeRecipients,
   type SmtpSettings,
@@ -247,7 +248,13 @@ export async function sendPreparedNewsletter(
     );
   }
 
-  const result = await sender.send(recipients, document, html, markdown);
+  const result = await sender.send(
+    recipients,
+    document,
+    html,
+    markdown,
+    buildNewsletterEmailAttachments(document, html, markdown),
+  );
   const recipientStore = options.recipientStore ?? new RecipientStore();
   await recipientStore.upsertMany(recipients);
   const jobId = options.jobId?.trim() || randomUUID();

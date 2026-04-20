@@ -11,18 +11,37 @@ export interface LegislationPreviewDetails {
   readonly noticeStatusLabel: string;
   readonly relevanceLabel: string;
   readonly summary: string;
+  readonly proposalReason: string | null;
+  readonly mainContent: string | null;
   readonly sections: readonly LegislationPreviewSection[];
 }
 
 export function buildLegislationPreview(item: LegislationItem): LegislationPreviewDetails {
   const raw = isRecord(item.raw) ? item.raw : {};
+  const proposalReason = pickText(raw, [
+    "RSN",
+    "PPSL_RSON_CNTN",
+    "PROPOSE_REASON",
+    "PROPOSAL_REASON",
+    "提案理由",
+    "제안이유",
+  ]);
+  const mainContent = pickText(raw, [
+    "DETAIL_CONTENT",
+    "MAIN_CONTENT",
+    "MAJOR_CONTENT",
+    "DETAIL_CNTNT",
+    "주요내용",
+    "提案內容",
+  ]);
   const summary = normalizeText(item.summary)
-    ?? pickText(raw, ["DETAIL_CONTENT", "RSN", "PPSL_RSON_CNTN"])
+    ?? mainContent
+    ?? proposalReason
     ?? "상세 요약 정보가 아직 수집되지 않았습니다.";
   const proposalDate = pickText(raw, ["PPSL_DT", "PROPOSE_DT", "PROPOS_DT"]);
   const sections = [
-    buildSection("제안이유", pickText(raw, ["RSN", "PPSL_RSON_CNTN", "提案理由"])),
-    buildSection("주요내용", pickText(raw, ["DETAIL_CONTENT", "MAIN_CONTENT", "MAJOR_CONTENT"])),
+    buildSection("제안이유", proposalReason),
+    buildSection("주요내용", mainContent),
     buildSection("심사 참고", buildReviewNote(raw)),
   ].filter((section): section is LegislationPreviewSection => Boolean(section));
 
@@ -32,6 +51,8 @@ export function buildLegislationPreview(item: LegislationItem): LegislationPrevi
     noticeStatusLabel: item.noticeStatus === "closed" ? "입법예고 종료" : "입법예고 진행중",
     relevanceLabel: formatRelevanceLabel(item.relevanceScore),
     summary,
+    proposalReason,
+    mainContent,
     sections,
   };
 }

@@ -249,6 +249,7 @@ http://localhost:3000/newsletter
 
 - 키워드와 기간으로 입법예고 검색
 - 발의 의원, 상임위 추가 필터로 결과 좁히기
+- 검색 링크 복사 후 URL로 다시 열기
 - 검색 조건 preset 저장, 다시 불러오기, 삭제
 - 진행중만 보기 또는 종료된 입법예고 포함 검색
 - 관련도 순 또는 종료일 기준 정렬
@@ -259,7 +260,10 @@ http://localhost:3000/newsletter
 - 상세 보기 모달에서 심사 이력과 접수/처리 이력 확인
 - 같은 검색 조건과 상세 보기 요청은 프로세스 내 TTL 캐시 재사용
 - 메일 제목, 브리핑 메모, 마무리 문구 편집
+- 선택 항목 또는 전체 결과 기준 HTML 파일 저장
+- 이메일 발송 시 같은 뉴스레터를 HTML, Markdown 첨부파일로 함께 전송
 - 현재 수신자 목록을 수신자 그룹으로 저장, 다시 불러오기, 추가하기, 삭제
+- 저장된 이메일 주소 수정 시 수신자 그룹, 구독 템플릿, 예약 발송 수신자 스냅샷도 함께 갱신
 - 검색 조건 + 수신자 + 발송 옵션을 구독 템플릿으로 저장, 다시 불러오기, 바로 예약
 - 발의 의원/상임위 필터도 preset, 구독 템플릿, 예약, HTML/Markdown에 함께 반영
 - 저장된 구독 템플릿으로 즉시 이메일 발송 또는 Markdown 저장
@@ -268,10 +272,10 @@ http://localhost:3000/newsletter
 - 수신자, 수신자 그룹, 검색 preset, 구독 템플릿 설정 백업/복원
 - 구독 템플릿/예약 발송에서 저장된 수신자 그룹을 연결해 최신 그룹 멤버 반영
 - 수신자 수, 활성 예약, 최근 7일 예약 성공/실패 요약 카드 확인
-- HTML 이메일 미리보기
+- 선택 항목 또는 전체 결과 기준 HTML 이메일 미리보기
 - Markdown 다운로드
 - 다중 이메일 수신자 발송
-- 발송 로그에서 보낸 HTML/Markdown 스냅샷 다시 확인
+- 발송 로그에서 보낸 HTML/Markdown 스냅샷 다시 확인, HTML/Markdown 저장
 - 발송 로그/예약 실행 이력 검색, 상태 필터, 현재 보기 CSV 저장
 - 발송 로그를 현재 수신자에게 재전송
 - 발송 실패한 개별 수신자만 바로 재시도
@@ -299,6 +303,22 @@ NEWSLETTER_DATA_DIR=/absolute/path/to/newsletter-data
 ```
 
 `설정 백업`과 `설정 복원`은 수신자, 수신자 그룹, 검색 preset, 구독 템플릿만 다루며 예약 발송과 발송 로그는 포함하지 않습니다.
+
+### Vercel에 배포할 때
+
+- `/newsletter` 화면과 즉시 발송은 Vercel에서 사용할 수 있습니다.
+- 저장 기능과 예약 발송까지 안정적으로 쓰려면 `Vercel Blob`을 함께 쓰는 편이 좋습니다.
+- Vercel에서는 기본 저장 경로가 `/tmp/.newsletter-data`로 바뀌며, 이 경로는 영구 저장소가 아닙니다.
+- `NEWSLETTER_STORAGE_BACKEND=vercel-blob`, `BLOB_READ_WRITE_TOKEN`을 설정하면 저장 데이터를 유지할 수 있습니다.
+- 예약 발송 자동 실행은 `/cron/newsletter`를 주기적으로 호출해야 합니다.
+- 자세한 단계별 설명은 [VERCEL.md](VERCEL.md)를 참고하세요.
+- 배포 전 점검은 `npm run vercel:check`, 환경 변수 목록 확인은 `npm run vercel:env`
+- GitHub Actions 외부 cron 예시는 `examples/github-actions-newsletter-cron.yml`
+- `/newsletter` 화면에서 현재 실행 환경, API 키, 저장소, 이메일 발송 준비 상태와 누락된 환경 변수 이름도 바로 볼 수 있습니다.
+- `/newsletter` 화면의 `Vercel 환경 변수 보기` 버튼으로 복붙용 env 템플릿을 열 수 있고, 현재 주소 기준 `cron` 호출 예시도 같이 볼 수 있습니다.
+- `/newsletter` 화면의 `GitHub Actions cron 보기` 버튼으로 외부 cron 워크플로 YAML도 바로 열 수 있습니다.
+- `/newsletter` 화면의 `Vercel cron 설정 보기` 버튼으로 `vercel.json`용 cron 스니펫 예시도 볼 수 있습니다.
+- `/newsletter` 화면의 `Vercel 배포 점검 보기` 버튼으로 배포 직후 확인 순서를 체크리스트로 바로 열 수 있습니다.
 
 ### CLI에서
 

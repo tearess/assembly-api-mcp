@@ -285,6 +285,13 @@ describe("newsletter/delivery", () => {
     const upsertManyCalls: string[][] = [];
     const saveCalls: string[] = [];
     const appendLogsCalls: string[] = [];
+    let capturedAttachments:
+      | readonly {
+        filename: string;
+        content: string;
+        contentType: string;
+      }[]
+      | undefined;
 
     const execution = await sendPreparedNewsletter(
       createDocument(),
@@ -294,11 +301,14 @@ describe("newsletter/delivery", () => {
       {
         jobId: "job-send-1",
         sender: {
-          send: async () => ({
-            sent: 2,
-            failed: 0,
-            failures: [],
-          }),
+          send: async (_recipients, _document, _html, _markdown, attachments) => {
+            capturedAttachments = attachments;
+            return {
+              sent: 2,
+              failed: 0,
+              failures: [],
+            };
+          },
         },
         recipientStore: {
           upsertMany: async (recipients) => {
@@ -346,6 +356,18 @@ describe("newsletter/delivery", () => {
     expect(saveCalls).toEqual(["job-send-1"]);
     expect(appendLogsCalls).toEqual(["job-send-1"]);
     expect(execution.logs.every((log) => log.snapshotAvailable)).toBe(true);
+    expect(capturedAttachments).toEqual([
+      {
+        filename: "legislation-newsletter_인공지능_2026-03-20_2026-04-20.html",
+        content: "<html><body>preview</body></html>",
+        contentType: "text/html; charset=utf-8",
+      },
+      {
+        filename: "legislation-newsletter_인공지능_2026-03-20_2026-04-20.md",
+        content: "# preview",
+        contentType: "text/markdown; charset=utf-8",
+      },
+    ]);
   });
 
   it("저장된 발송 스냅샷은 현재 수신자에게 다시 보낼 수 있다", async () => {

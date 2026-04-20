@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { normalizeRecipients } from "../../src/newsletter/email.js";
-import { renderNewsletterHtml } from "../../src/newsletter/render-html.js";
+import {
+  buildHtmlFilename,
+  renderNewsletterHtml,
+} from "../../src/newsletter/render-html.js";
 import {
   buildMarkdownFilename,
   renderNewsletterMarkdown,
@@ -57,6 +60,11 @@ describe("newsletter/render", () => {
   it("Markdown 파일명을 생성한다", () => {
     const filename = buildMarkdownFilename(createDocument());
     expect(filename).toBe("legislation-newsletter_인공지능_2026-03-20_2026-04-20.md");
+  });
+
+  it("HTML 파일명을 생성한다", () => {
+    const filename = buildHtmlFilename(createDocument());
+    expect(filename).toBe("legislation-newsletter_인공지능_2026-03-20_2026-04-20.html");
   });
 
   it("HTML 뉴스레터를 생성한다", () => {

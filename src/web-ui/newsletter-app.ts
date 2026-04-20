@@ -131,6 +131,7 @@ export function buildNewsletterAppHtml(
       display: grid;
       grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.75fr);
       gap: 18px;
+      align-items: start;
     }
 
     .left-stack,
@@ -138,12 +139,14 @@ export function buildNewsletterAppHtml(
       display: grid;
       gap: 18px;
       align-content: start;
+      min-width: 0;
     }
 
     .panel,
     .preview-card,
     .composer-card {
       padding: 22px;
+      min-width: 0;
     }
 
     .section-head {
@@ -525,6 +528,12 @@ export function buildNewsletterAppHtml(
       white-space: pre-wrap;
     }
 
+    .preview-section.empty p,
+    .detail-section-card.empty p {
+      color: var(--muted);
+      font-style: italic;
+    }
+
     .inline-row-actions {
       display: flex;
       gap: 8px;
@@ -558,6 +567,82 @@ export function buildNewsletterAppHtml(
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 14px;
+    }
+
+    .runtime-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .runtime-card {
+      display: grid;
+      gap: 6px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(24, 53, 47, 0.05);
+      border: 1px solid rgba(24, 53, 47, 0.08);
+    }
+
+    .runtime-card.ok {
+      background: rgba(15, 118, 98, 0.08);
+      border-color: rgba(15, 118, 98, 0.18);
+    }
+
+    .runtime-card.warn {
+      background: rgba(183, 75, 52, 0.08);
+      border-color: rgba(183, 75, 52, 0.2);
+    }
+
+    .runtime-kicker {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .runtime-value {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.4;
+    }
+
+    .runtime-note {
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    .runtime-notice-list {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .runtime-notice {
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(24, 53, 47, 0.08);
+      background: rgba(255, 250, 242, 0.82);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    .runtime-notice.warn {
+      border-color: rgba(183, 75, 52, 0.2);
+      background: rgba(183, 75, 52, 0.07);
+    }
+
+    .code-textarea {
+      min-height: 360px;
+      font-family: "SFMono-Regular", "Consolas", "Menlo", monospace;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      resize: vertical;
+      white-space: pre;
     }
 
     .summary-card {
@@ -824,9 +909,14 @@ export function buildNewsletterAppHtml(
       background: #fffdf8;
     }
 
-    @media (max-width: 1120px) {
-      .hero,
+    @media (max-width: 1240px) {
       .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 1120px) {
+      .hero {
         grid-template-columns: 1fr;
       }
     }
@@ -843,7 +933,8 @@ export function buildNewsletterAppHtml(
       .saved-preset-row { grid-template-columns: 1fr; }
       .recipient-row { grid-template-columns: 1fr; }
       .schedule-row { grid-template-columns: 1fr; }
-      .summary-grid { grid-template-columns: 1fr; }
+      .summary-grid,
+      .runtime-grid { grid-template-columns: 1fr; }
       .actions-row { display: grid; grid-template-columns: 1fr; }
       .saved-preset-actions { width: 100%; display: grid; grid-template-columns: 1fr; }
       .primary-btn,
@@ -1021,6 +1112,16 @@ export function buildNewsletterAppHtml(
               <div class="preview-box"><div class="label">관련도</div><div class="value" id="previewRelevance"></div></div>
             </div>
             <div class="summary-block" id="previewSummary"></div>
+            <div class="preview-section-list">
+              <section class="preview-section" id="previewProposalReasonSection">
+                <h4>제안이유</h4>
+                <p id="previewProposalReason"></p>
+              </section>
+              <section class="preview-section" id="previewMainContentSection">
+                <h4>주요내용</h4>
+                <p id="previewMainContent"></p>
+              </section>
+            </div>
             <div class="preview-section-list" id="previewSections"></div>
             <div class="inline-row-actions">
               <button id="openPreviewDetailBtn" class="mini-action-btn" type="button">상세 보기</button>
@@ -1038,8 +1139,14 @@ export function buildNewsletterAppHtml(
               <div class="subtle">이메일 주소를 여러 개 추가하고, 전체 또는 선택 항목 기준으로 발송/저장할 수 있습니다.</div>
             </div>
           </div>
+          <div class="runtime-grid" id="runtimeStatusGrid"></div>
+          <div class="runtime-notice-list" id="runtimeNoticeList"></div>
           <div class="summary-grid" id="operationalSummaryGrid"></div>
           <div class="saved-preset-actions" style="justify-content: flex-start; margin-top: 12px;">
+            <button id="viewVercelChecklistBtn" class="ghost-btn" type="button">Vercel 배포 점검 보기</button>
+            <button id="viewVercelEnvBtn" class="ghost-btn" type="button">Vercel 환경 변수 보기</button>
+            <button id="viewVercelCronBtn" class="ghost-btn" type="button">Vercel cron 설정 보기</button>
+            <button id="viewCronWorkflowBtn" class="ghost-btn" type="button">GitHub Actions cron 보기</button>
             <button id="exportSettingsBtn" class="ghost-btn" type="button">설정 백업</button>
             <button id="importSettingsBtn" class="ghost-btn" type="button">설정 복원</button>
           </div>
@@ -1086,7 +1193,10 @@ export function buildNewsletterAppHtml(
           </label>
 
           <div class="actions-row">
-            <button id="previewBtn" class="ghost-btn" type="button">HTML 미리보기</button>
+            <button id="previewSelectedBtn" class="ghost-btn" type="button">선택 항목 HTML 미리보기</button>
+            <button id="previewAllBtn" class="ghost-btn" type="button">전체 결과 HTML 미리보기</button>
+            <button id="downloadSelectedHtmlBtn" class="ghost-btn" type="button">선택 항목 HTML 저장</button>
+            <button id="downloadAllHtmlBtn" class="ghost-btn" type="button">전체 결과 HTML 저장</button>
             <button id="sendSelectedBtn" class="primary-btn" type="button">선택 항목 이메일 발송</button>
             <button id="sendAllBtn" class="primary-btn" type="button">전체 결과 이메일 발송</button>
             <button id="downloadSelectedBtn" class="accent-btn" type="button">선택 항목 Markdown 저장</button>
@@ -1218,7 +1328,10 @@ export function buildNewsletterAppHtml(
   <div class="modal" id="previewModal">
     <div class="modal-card">
       <div class="modal-head">
-        <strong>이메일 HTML 미리보기</strong>
+        <div>
+          <strong id="previewModalTitle">이메일 HTML 미리보기</strong>
+          <div id="previewModalMeta" class="subtle" style="margin-top: 4px;">선택 항목 또는 전체 결과 기준으로 본문을 확인합니다.</div>
+        </div>
         <button id="closeModalBtn" class="danger-btn" type="button">닫기</button>
       </div>
       <div class="modal-body">
@@ -1237,6 +1350,25 @@ export function buildNewsletterAppHtml(
         <div id="billDetailContent" class="detail-modal-body">
           <div class="subtle">법안 상세 정보를 불러오는 중입니다.</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="envTemplateModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <strong id="envTemplateTitle">Vercel 환경 변수 템플릿</strong>
+          <div id="envTemplateMeta" class="subtle" style="margin-top: 4px;">배포 전에 필요한 env 값을 복사하거나 파일로 저장할 수 있습니다.</div>
+        </div>
+        <div class="saved-preset-actions" style="margin: 0;">
+          <button id="copyEnvTemplateBtn" class="ghost-btn" type="button">복사</button>
+          <button id="downloadEnvTemplateBtn" class="ghost-btn" type="button">파일 저장</button>
+          <button id="closeEnvTemplateModalBtn" class="danger-btn" type="button">닫기</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <textarea id="envTemplateText" class="code-textarea" readonly></textarea>
       </div>
     </div>
   </div>
@@ -1263,6 +1395,7 @@ export function buildNewsletterAppHtml(
       totalPages: 1,
       itemCache: new Map(),
       detailCache: new Map(),
+      previewDetailLoadingIds: new Set(),
       selectedBillIds: new Set(),
       previewItemId: null,
       searchPresets: [],
@@ -1278,6 +1411,10 @@ export function buildNewsletterAppHtml(
       scheduleRunFilterText: "",
       scheduleRunFilterStatus: "all",
       operationalSummary: null,
+      runtimeStatus: null,
+      templateModalText: "",
+      templateModalFilename: "vercel-newsletter.env",
+      templateModalDownloadUrl: "/api/newsletter/vercel-env-template?download=1",
       recipients: [],
       sendLogs: [],
       sendLogFilterText: "",
@@ -1329,7 +1466,13 @@ export function buildNewsletterAppHtml(
     const downloadScheduleRunsCsvBtn = document.getElementById("downloadScheduleRunsCsvBtn");
     const scheduleRunFilterBar = document.getElementById("scheduleRunFilterBar");
     const scheduleRunList = document.getElementById("scheduleRunList");
+    const runtimeStatusGrid = document.getElementById("runtimeStatusGrid");
+    const runtimeNoticeList = document.getElementById("runtimeNoticeList");
     const operationalSummaryGrid = document.getElementById("operationalSummaryGrid");
+    const viewVercelChecklistBtn = document.getElementById("viewVercelChecklistBtn");
+    const viewVercelEnvBtn = document.getElementById("viewVercelEnvBtn");
+    const viewVercelCronBtn = document.getElementById("viewVercelCronBtn");
+    const viewCronWorkflowBtn = document.getElementById("viewCronWorkflowBtn");
     const sendLogSearchInput = document.getElementById("sendLogSearchInput");
     const sendLogStatusSelect = document.getElementById("sendLogStatusSelect");
     const sendLogFilterMeta = document.getElementById("sendLogFilterMeta");
@@ -1351,13 +1494,23 @@ export function buildNewsletterAppHtml(
     const previewProposalDate = document.getElementById("previewProposalDate");
     const previewRelevance = document.getElementById("previewRelevance");
     const previewSummary = document.getElementById("previewSummary");
+    const previewProposalReason = document.getElementById("previewProposalReason");
+    const previewMainContent = document.getElementById("previewMainContent");
+    const previewProposalReasonSection = document.getElementById("previewProposalReasonSection");
+    const previewMainContentSection = document.getElementById("previewMainContentSection");
     const previewSections = document.getElementById("previewSections");
     const previewLink = document.getElementById("previewLink");
     const openPreviewDetailBtn = document.getElementById("openPreviewDetailBtn");
     const previewModal = document.getElementById("previewModal");
+    const previewModalTitle = document.getElementById("previewModalTitle");
+    const previewModalMeta = document.getElementById("previewModalMeta");
     const previewFrame = document.getElementById("previewFrame");
     const billDetailModal = document.getElementById("billDetailModal");
     const billDetailContent = document.getElementById("billDetailContent");
+    const envTemplateModal = document.getElementById("envTemplateModal");
+    const envTemplateTitle = document.getElementById("envTemplateTitle");
+    const envTemplateMeta = document.getElementById("envTemplateMeta");
+    const envTemplateText = document.getElementById("envTemplateText");
 
     applyPreset("1m");
     noticeScopeSelect.value = state.query.noticeScope;
@@ -1375,6 +1528,7 @@ export function buildNewsletterAppHtml(
     renderRecipients();
     renderRecipientGroups();
     renderSubscriptionTemplates();
+    renderRuntimeStatus();
     renderOperationalSummary();
     renderScheduleJobs();
     renderScheduleRuns();
@@ -1387,6 +1541,7 @@ export function buildNewsletterAppHtml(
     void loadRecipientGroups();
     void loadSubscriptionTemplates();
     void loadSubscriptionActivities();
+    void loadRuntimeStatus();
     void loadOperationalSummary();
     void loadSchedules();
     void loadScheduleRuns();
@@ -1397,6 +1552,7 @@ export function buildNewsletterAppHtml(
     }
     window.setInterval(() => {
       void loadSubscriptionActivities();
+      void loadRuntimeStatus();
       void loadOperationalSummary();
       void loadSchedules();
       void loadScheduleRuns();
@@ -1507,6 +1663,22 @@ export function buildNewsletterAppHtml(
       await downloadSendLogsCsv();
     });
 
+    viewVercelChecklistBtn.addEventListener("click", async () => {
+      await openVercelDeployChecklistModal();
+    });
+
+    viewVercelEnvBtn.addEventListener("click", async () => {
+      await openVercelEnvTemplateModal();
+    });
+
+    viewVercelCronBtn.addEventListener("click", async () => {
+      await openVercelCronTemplateModal();
+    });
+
+    viewCronWorkflowBtn.addEventListener("click", async () => {
+      await openGithubActionsCronTemplateModal();
+    });
+
     ["input", "change"].forEach((eventName) => {
       dateFromInput.addEventListener(eventName, () => {
         setCustomDateMode();
@@ -1577,8 +1749,20 @@ export function buildNewsletterAppHtml(
       }
     });
 
-    document.getElementById("previewBtn").addEventListener("click", async () => {
-      await openHtmlPreview();
+    document.getElementById("previewSelectedBtn").addEventListener("click", async () => {
+      await openHtmlPreview(false);
+    });
+
+    document.getElementById("previewAllBtn").addEventListener("click", async () => {
+      await openHtmlPreview(true);
+    });
+
+    document.getElementById("downloadSelectedHtmlBtn").addEventListener("click", async () => {
+      await downloadHtml(false);
+    });
+
+    document.getElementById("downloadAllHtmlBtn").addEventListener("click", async () => {
+      await downloadHtml(true);
     });
 
     openPreviewDetailBtn.addEventListener("click", async () => {
@@ -1624,11 +1808,25 @@ export function buildNewsletterAppHtml(
 
     document.getElementById("closeModalBtn").addEventListener("click", () => {
       previewModal.classList.remove("open");
+      previewModalTitle.textContent = "이메일 HTML 미리보기";
+      previewModalMeta.textContent = "선택 항목 또는 전체 결과 기준으로 본문을 확인합니다.";
       previewFrame.srcdoc = "";
     });
 
     document.getElementById("closeBillDetailModalBtn").addEventListener("click", () => {
       billDetailModal.classList.remove("open");
+    });
+
+    document.getElementById("closeEnvTemplateModalBtn").addEventListener("click", () => {
+      envTemplateModal.classList.remove("open");
+    });
+
+    document.getElementById("copyEnvTemplateBtn").addEventListener("click", async () => {
+      await copyVercelEnvTemplate();
+    });
+
+    document.getElementById("downloadEnvTemplateBtn").addEventListener("click", async () => {
+      await downloadVercelEnvTemplate();
     });
 
     function applyPreset(preset) {
@@ -1751,6 +1949,7 @@ export function buildNewsletterAppHtml(
         const activityStatus = getSubscriptionActivityStatus(activity);
         const latestSnapshotButtons = activity && activity.latestSnapshotJobId
           ? '<button type="button" class="ghost-btn" data-open-subscription-html="' + escapeHtml(activity.latestSnapshotJobId) + '">최근 발송 HTML</button>' +
+            '<button type="button" class="ghost-btn" data-download-subscription-html="' + escapeHtml(activity.latestSnapshotJobId) + '">최근 발송 HTML 저장</button>' +
             '<button type="button" class="ghost-btn" data-download-subscription-markdown="' + escapeHtml(activity.latestSnapshotJobId) + '">최근 발송 Markdown</button>'
           : "";
         return '<div class="saved-preset-item">' +
@@ -1793,6 +1992,12 @@ export function buildNewsletterAppHtml(
       savedSubscriptionList.querySelectorAll("button[data-open-subscription-html]").forEach((button) => {
         button.addEventListener("click", async () => {
           await openSendLogHtml(button.dataset.openSubscriptionHtml);
+        });
+      });
+
+      savedSubscriptionList.querySelectorAll("button[data-download-subscription-html]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await downloadSendLogHtml(button.dataset.downloadSubscriptionHtml);
         });
       });
 
@@ -2117,6 +2322,43 @@ export function buildNewsletterAppHtml(
       state.query.pageSize = Number(pageSizeSelect.value) || DEFAULT_PAGE_SIZE;
     }
 
+    function resetSearchForm() {
+      keywordInput.value = "";
+      proposerFilterInput.value = "";
+      committeeFilterInput.value = "";
+      applyPreset("1m");
+      noticeScopeSelect.value = "include_closed";
+      sortBySelect.value = "relevance";
+      pageSizeSelect.value = String(DEFAULT_PAGE_SIZE);
+      state.query.page = 1;
+      startNewSearch();
+      setStatus(searchStatus, "검색 조건을 초기화하고 기본 1개월 범위로 다시 조회했습니다.", "success");
+    }
+
+    async function copySearchLink() {
+      const query = {
+        keyword: state.query.keyword || "",
+        proposerFilter: state.query.proposerFilter || "",
+        committeeFilter: state.query.committeeFilter || "",
+        datePreset: state.query.datePreset,
+        dateFrom: state.query.dateFrom || "",
+        dateTo: state.query.dateTo || "",
+        noticeScope: state.query.noticeScope,
+        sortBy: state.query.sortBy,
+        page: state.query.page,
+        pageSize: state.query.pageSize,
+      };
+      const params = buildSearchUrlParams(query);
+      const url = window.location.origin + window.location.pathname + (params.toString() ? "?" + params.toString() : "");
+
+      try {
+        await copyText(url);
+        setStatus(searchStatus, "현재 검색 조건 링크를 복사했습니다.", "success");
+      } catch (error) {
+        setStatus(searchStatus, (error && error.message) || "검색 링크 복사에 실패했습니다.", "error");
+      }
+    }
+
     async function performSearch() {
       setStatus(searchStatus, "검색 중입니다...");
 
@@ -2161,6 +2403,7 @@ export function buildNewsletterAppHtml(
           " · 범위 " + getNoticeScopeLabel(data.query.noticeScope) +
           " · 정렬 " + getSortByLabel(data.query.sortBy) +
           getAdditionalSearchFilterSummary(data.query);
+        replaceSearchUrl(data.query);
         if (!subjectInput.value.trim()) {
           const subjectKeyword = data.query.keyword || data.query.committeeFilter || data.query.proposerFilter || "입법예고";
           subjectInput.value = "[입법예고 뉴스레터] " + subjectKeyword + " 관련 법안 브리핑";
@@ -2259,7 +2502,33 @@ export function buildNewsletterAppHtml(
       previewProposalDate.textContent = preview.proposalDate || "미상";
       previewRelevance.textContent = preview.relevanceLabel || getPreviewRelevanceLabel(item.relevanceScore);
       previewSummary.textContent = preview.summary || item.summary || "상세 요약 정보가 아직 수집되지 않았습니다.";
-      const previewSectionsData = Array.isArray(preview.sections) ? preview.sections : [];
+      const proposalReason = getPreviewText(preview, "proposalReason", item, [
+        "RSN",
+        "PPSL_RSON_CNTN",
+        "PROPOSE_REASON",
+        "PROPOSAL_REASON",
+        "제안이유",
+      ]);
+      const mainContent = getPreviewText(preview, "mainContent", item, [
+        "DETAIL_CONTENT",
+        "MAIN_CONTENT",
+        "MAJOR_CONTENT",
+        "DETAIL_CNTNT",
+        "주요내용",
+      ]);
+      const previewSectionsData = getAdditionalPreviewSections(preview);
+      renderPreviewSectionBlock(
+        previewProposalReasonSection,
+        previewProposalReason,
+        proposalReason,
+        "제안이유 정보가 아직 수집되지 않았습니다.",
+      );
+      renderPreviewSectionBlock(
+        previewMainContentSection,
+        previewMainContent,
+        mainContent,
+        "주요내용 정보가 아직 수집되지 않았습니다.",
+      );
       previewSections.innerHTML = previewSectionsData.length
         ? previewSectionsData.map((section) =>
           '<section class="preview-section">' +
@@ -2267,9 +2536,13 @@ export function buildNewsletterAppHtml(
             '<p>' + escapeHtml(section.content || "") + '</p>' +
           '</section>'
         ).join("")
-        : '<div class="subtle">제안이유나 주요내용은 원문 링크에서 추가 확인할 수 있습니다.</div>';
+        : '<div class="subtle">심사 참고 등 추가 정보가 있으면 여기에 표시됩니다.</div>';
       previewLink.href = item.detailUrl || "#";
       previewLink.textContent = item.detailUrl ? "원문 보기" : "원문 링크 없음";
+      void ensurePreviewDetailLoaded(item, {
+        proposalReason,
+        mainContent,
+      });
     }
 
     async function openBillDetail(billId) {
@@ -2301,9 +2574,23 @@ export function buildNewsletterAppHtml(
     function renderBillDetail(detail) {
       const item = detail && detail.item ? detail.item : {};
       const preview = detail && detail.preview ? detail.preview : {};
-      const previewSectionsData = Array.isArray(preview.sections) ? preview.sections : [];
+      const previewSectionsData = getAdditionalPreviewSections(preview);
       const reviewEvents = Array.isArray(detail && detail.reviewEvents) ? detail.reviewEvents : [];
       const historyEvents = Array.isArray(detail && detail.historyEvents) ? detail.historyEvents : [];
+      const proposalReason = getPreviewText(preview, "proposalReason", item, [
+        "RSN",
+        "PPSL_RSON_CNTN",
+        "PROPOSE_REASON",
+        "PROPOSAL_REASON",
+        "제안이유",
+      ]);
+      const mainContent = getPreviewText(preview, "mainContent", item, [
+        "DETAIL_CONTENT",
+        "MAIN_CONTENT",
+        "MAJOR_CONTENT",
+        "DETAIL_CNTNT",
+        "주요내용",
+      ]);
 
       return [
         '<div>',
@@ -2320,6 +2607,16 @@ export function buildNewsletterAppHtml(
         createDetailCard("제안일", preview.proposalDate || "미상"),
         createDetailCard("관련도", preview.relevanceLabel || getPreviewRelevanceLabel(item.relevanceScore)),
         '</div>',
+        renderDetailSectionCard(
+          "제안이유",
+          proposalReason,
+          "제안이유 정보가 아직 수집되지 않았습니다.",
+        ),
+        renderDetailSectionCard(
+          "주요내용",
+          mainContent,
+          "주요내용 정보가 아직 수집되지 않았습니다.",
+        ),
         previewSectionsData.length
           ? previewSectionsData.map((section) =>
             '<section class="detail-section-card">' +
@@ -2334,6 +2631,134 @@ export function buildNewsletterAppHtml(
           ? '<div class="inline-row-actions"><a class="mini-action-btn" href="' + escapeHtml(item.detailUrl) + '" target="_blank" rel="noreferrer">원문 열기</a></div>'
           : '<div class="subtle">원문 링크가 없습니다.</div>',
       ].join("");
+    }
+
+    function getPreviewText(preview, fieldName, item, rawKeys) {
+      if (preview && typeof preview[fieldName] === "string" && preview[fieldName].trim()) {
+        return preview[fieldName].trim();
+      }
+      const raw = item && item.raw && typeof item.raw === "object" ? item.raw : {};
+      for (const key of rawKeys) {
+        const value = raw[key];
+        if (typeof value === "string" && value.trim()) {
+          return value.trim();
+        }
+      }
+      return "";
+    }
+
+    function getAdditionalPreviewSections(preview) {
+      const sections = Array.isArray(preview && preview.sections) ? preview.sections : [];
+      return sections.filter((section) => {
+        const title = (section && section.title ? section.title : "").trim();
+        return title !== "제안이유" && title !== "주요내용";
+      });
+    }
+
+    function renderPreviewSectionBlock(sectionElement, contentElement, content, emptyMessage) {
+      const hasContent = Boolean(content);
+      sectionElement.classList.toggle("empty", !hasContent);
+      contentElement.textContent = hasContent ? content : emptyMessage;
+    }
+
+    function renderDetailSectionCard(title, content, emptyMessage) {
+      const hasContent = Boolean(content);
+      return '<section class="detail-section-card' + (hasContent ? '' : ' empty') + '">' +
+        '<h4>' + escapeHtml(title) + '</h4>' +
+        '<p>' + escapeHtml(hasContent ? content : emptyMessage) + '</p>' +
+        '</section>';
+    }
+
+    async function ensurePreviewDetailLoaded(item, previewState) {
+      if (!item || !item.billId) {
+        return;
+      }
+      if (previewState.proposalReason || previewState.mainContent) {
+        return;
+      }
+      if (state.detailCache.has(item.billId)) {
+        const cachedDetail = state.detailCache.get(item.billId);
+        const cachedPreview = cachedDetail && cachedDetail.preview ? cachedDetail.preview : {};
+        const cachedProposalReason = getPreviewText(cachedPreview, "proposalReason", cachedDetail && cachedDetail.item, [
+          "RSN",
+          "PPSL_RSON_CNTN",
+          "PROPOSE_REASON",
+          "PROPOSAL_REASON",
+          "제안이유",
+        ]);
+        const cachedMainContent = getPreviewText(cachedPreview, "mainContent", cachedDetail && cachedDetail.item, [
+          "DETAIL_CONTENT",
+          "MAIN_CONTENT",
+          "MAJOR_CONTENT",
+          "DETAIL_CNTNT",
+          "주요내용",
+        ]);
+        if (cachedDetail && (cachedProposalReason || cachedMainContent)) {
+          mergeDetailIntoStateItem(item.billId, cachedDetail);
+          if (state.previewItemId === item.billId) {
+            renderPreview();
+          }
+        }
+        return;
+      }
+      if (state.previewDetailLoadingIds.has(item.billId)) {
+        return;
+      }
+
+      state.previewDetailLoadingIds.add(item.billId);
+      try {
+        const response = await fetch("/api/legislation/" + encodeURIComponent(item.billId));
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "법안 상세 정보를 불러오지 못했습니다.");
+        }
+        state.detailCache.set(item.billId, data);
+        const fetchedProposalReason = getPreviewText(data.preview || {}, "proposalReason", data.item, [
+          "RSN",
+          "PPSL_RSON_CNTN",
+          "PROPOSE_REASON",
+          "PROPOSAL_REASON",
+          "제안이유",
+        ]);
+        const fetchedMainContent = getPreviewText(data.preview || {}, "mainContent", data.item, [
+          "DETAIL_CONTENT",
+          "MAIN_CONTENT",
+          "MAJOR_CONTENT",
+          "DETAIL_CNTNT",
+          "주요내용",
+        ]);
+        if (fetchedProposalReason || fetchedMainContent) {
+          mergeDetailIntoStateItem(item.billId, data);
+        }
+        if ((fetchedProposalReason || fetchedMainContent) && state.previewItemId === item.billId) {
+          renderPreview();
+        }
+      } catch {
+        // 미리보기 보강 실패는 조용히 무시하고, 상세 보기 버튼으로 다시 시도할 수 있게 둔다.
+      } finally {
+        state.previewDetailLoadingIds.delete(item.billId);
+      }
+    }
+
+    function mergeDetailIntoStateItem(billId, detail) {
+      if (!detail || !detail.item) {
+        return;
+      }
+      const mergedItem = {
+        ...detail.item,
+        preview: detail.preview || {},
+      };
+
+      state.items = state.items.map((entry) =>
+        entry.billId === billId
+          ? { ...entry, ...mergedItem }
+          : entry
+      );
+
+      if (state.itemCache.has(billId)) {
+        const cachedItem = state.itemCache.get(billId);
+        state.itemCache.set(billId, { ...cachedItem, ...mergedItem });
+      }
     }
 
     function renderTimeline(items, emptyMessage) {
@@ -2493,8 +2918,80 @@ export function buildNewsletterAppHtml(
         return;
       }
       recipientList.innerHTML = state.recipients.map((recipient) => {
-        return '<span class="chip">' + escapeHtml(recipient) + '<button type="button" data-remove="' + escapeHtml(recipient) + '">삭제</button></span>';
+        return '<span class="chip">' +
+          escapeHtml(recipient) +
+          '<button type="button" data-edit="' + escapeHtml(recipient) + '">수정</button>' +
+          '<button type="button" data-remove="' + escapeHtml(recipient) + '">삭제</button>' +
+          '</span>';
       }).join("");
+
+      recipientList.querySelectorAll("button[data-edit]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const previousEmail = button.dataset.edit || "";
+          const nextEmail = window.prompt("새 이메일 주소를 입력해 주세요.", previousEmail);
+          if (nextEmail === null) {
+            return;
+          }
+
+          const trimmedNextEmail = nextEmail.trim();
+          if (!trimmedNextEmail) {
+            setStatus(composerStatus, "새 이메일 주소를 입력해 주세요.", "error");
+            return;
+          }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedNextEmail)) {
+            setStatus(composerStatus, "이메일 형식이 올바르지 않습니다.", "error");
+            return;
+          }
+          if (trimmedNextEmail.toLowerCase() === previousEmail.toLowerCase()) {
+            setStatus(composerStatus, "기존과 같은 이메일입니다.", "error");
+            return;
+          }
+
+          try {
+            const response = await fetch("/api/recipients", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                previousEmail,
+                nextEmail: trimmedNextEmail,
+              }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.error || "이메일 수정에 실패했습니다.");
+            }
+
+            state.recipients = (data.items || []).map((item) => item.email);
+            renderRecipients();
+            updateComposerStatus();
+            await Promise.all([
+              loadRecipientGroups(),
+              loadSubscriptionTemplates(),
+              loadSchedules(),
+            ]);
+
+            const cascadeSummary = [];
+            if (Number(data.recipientGroupsUpdated) > 0) {
+              cascadeSummary.push("그룹 " + String(data.recipientGroupsUpdated) + "개");
+            }
+            if (Number(data.subscriptionTemplatesUpdated) > 0) {
+              cascadeSummary.push("구독 " + String(data.subscriptionTemplatesUpdated) + "개");
+            }
+            if (Number(data.scheduledJobsUpdated) > 0) {
+              cascadeSummary.push("예약 " + String(data.scheduledJobsUpdated) + "개");
+            }
+            setStatus(
+              composerStatus,
+              cascadeSummary.length
+                ? "이메일을 수정했습니다. " + cascadeSummary.join(" · ") + "에 반영했습니다."
+                : "이메일을 수정했습니다.",
+              "success",
+            );
+          } catch (error) {
+            setStatus(composerStatus, error.message || "이메일 수정에 실패했습니다.", "error");
+          }
+        });
+      });
 
       recipientList.querySelectorAll("button[data-remove]").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -2693,6 +3190,7 @@ export function buildNewsletterAppHtml(
         const actions = log.snapshotAvailable
           ? '<div class="saved-preset-actions" style="justify-content: flex-start;">' +
               '<button type="button" class="ghost-btn" data-open-log-html="' + escapeHtml(log.jobId) + '">HTML 보기</button>' +
+              '<button type="button" class="ghost-btn" data-download-log-html="' + escapeHtml(log.jobId) + '">HTML 저장</button>' +
               '<button type="button" class="ghost-btn" data-download-log-markdown="' + escapeHtml(log.jobId) + '">Markdown 저장</button>' +
               (log.status === "failed"
                 ? '<button type="button" class="ghost-btn" data-retry-failed-log="' + escapeHtml(log.id) + '">이 수신자 재시도</button>'
@@ -2713,6 +3211,12 @@ export function buildNewsletterAppHtml(
       sendLogList.querySelectorAll("button[data-open-log-html]").forEach((button) => {
         button.addEventListener("click", async () => {
           await openSendLogHtml(button.dataset.openLogHtml);
+        });
+      });
+
+      sendLogList.querySelectorAll("button[data-download-log-html]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await downloadSendLogHtml(button.dataset.downloadLogHtml);
         });
       });
 
@@ -2827,11 +3331,93 @@ export function buildNewsletterAppHtml(
       ].join("");
     }
 
+    function renderRuntimeStatus() {
+      const runtimeStatus = state.runtimeStatus;
+      if (!runtimeStatus) {
+        runtimeStatusGrid.innerHTML = [
+          createRuntimeCard("실행 환경", "-", "현재 서버 환경을 확인하는 중입니다.", "default"),
+          createRuntimeCard("API 키", "-", "열린국회 API 연결 상태를 확인합니다.", "default"),
+          createRuntimeCard("저장소", "-", "저장 데이터 보관 방식을 확인합니다.", "default"),
+          createRuntimeCard("이메일 발송", "-", "SMTP 설정 여부를 확인합니다.", "default"),
+          createRuntimeCard("예약 보호", "-", "CRON_SECRET 설정 여부를 확인합니다.", "default"),
+        ].join("");
+        runtimeNoticeList.innerHTML = "";
+        return;
+      }
+
+      runtimeStatusGrid.innerHTML = [
+        createRuntimeCard(
+          "실행 환경",
+          runtimeStatus.platformLabel,
+          "기준 " + runtimeStatus.asOf,
+          "default",
+        ),
+        createRuntimeCard(
+          "API 키",
+          runtimeStatus.apiKeyConfigured ? "준비 완료" : "설정 필요",
+          runtimeStatus.apiKeyConfigured ? "법안 검색과 상세 조회를 사용할 수 있습니다." : "ASSEMBLY_API_KEY 값을 채워야 합니다.",
+          runtimeStatus.apiKeyConfigured ? "ok" : "warn",
+        ),
+        createRuntimeCard(
+          "저장소",
+          runtimeStatus.storageLabel,
+          runtimeStatus.persistentStorage ? "저장 데이터가 유지됩니다." : "저장 데이터가 유지되지 않을 수 있습니다.",
+          runtimeStatus.persistentStorage ? "ok" : "warn",
+        ),
+        createRuntimeCard(
+          "이메일 발송",
+          runtimeStatus.smtpConfigured ? "준비 완료" : "추가 설정 필요",
+          runtimeStatus.smtpConfigured ? "즉시 발송과 재전송을 사용할 수 있습니다." : "NEWSLETTER_SMTP_* 값을 채워야 합니다.",
+          runtimeStatus.smtpConfigured ? "ok" : "warn",
+        ),
+        createRuntimeCard(
+          "예약 보호",
+          runtimeStatus.cronSecretConfigured ? "CRON_SECRET 설정됨" : "보호 설정 필요",
+          runtimeStatus.cronSecretConfigured ? "/cron/newsletter 호출을 인증 헤더로 보호합니다." : "외부 호출 보호를 위해 CRON_SECRET 설정을 권장합니다.",
+          runtimeStatus.cronSecretConfigured ? "ok" : "warn",
+        ),
+      ].join("");
+
+      const notices = []
+        .concat((runtimeStatus.warnings || []).map((message) => ({ kind: "warn", message })))
+        .concat((runtimeStatus.missingEnvKeys || []).length
+          ? [{
+              kind: "warn",
+              message: "누락된 환경 변수: " + runtimeStatus.missingEnvKeys.join(", "),
+            }]
+          : [])
+        .concat((runtimeStatus.recommendedActions || []).map((message) => ({
+          kind: "default",
+          message: "다음 조치: " + message,
+        })))
+        .concat((runtimeStatus.notes || []).map((message) => ({ kind: "default", message })));
+      runtimeNoticeList.innerHTML = notices.length
+        ? notices.map((notice) =>
+          '<div class="runtime-notice' + (notice.kind === "warn" ? ' warn' : '') + '">' +
+            escapeHtml(notice.message) +
+          '</div>'
+        ).join("")
+        : "";
+    }
+
     function createSummaryCard(label, value, note) {
       return '<div class="summary-card">' +
         '<div class="summary-kicker">' + escapeHtml(label) + '</div>' +
         '<div class="summary-value">' + escapeHtml(value) + '</div>' +
         '<div class="summary-note">' + escapeHtml(note) + '</div>' +
+        '</div>';
+    }
+
+    function createRuntimeCard(label, value, note, kind) {
+      const className = kind === "warn"
+        ? "runtime-card warn"
+        : kind === "ok"
+          ? "runtime-card ok"
+          : "runtime-card";
+      return '<div class="' + className + '">' +
+        '<div class="runtime-kicker">' + escapeHtml(label) + '</div>' +
+        '<div class="runtime-value">' + escapeHtml(value) + '</div>' +
+        '<div class="runtime-note">' + escapeHtml(note) + '</div>' +
         '</div>';
     }
 
@@ -3053,6 +3639,7 @@ export function buildNewsletterAppHtml(
         const snapshotActions = run.deliveryJobId
           ? '<div class="saved-preset-actions" style="justify-content: flex-start;">' +
               '<button type="button" class="ghost-btn" data-open-schedule-run-html="' + escapeHtml(run.deliveryJobId) + '">HTML 보기</button>' +
+              '<button type="button" class="ghost-btn" data-download-schedule-run-html="' + escapeHtml(run.deliveryJobId) + '">HTML 저장</button>' +
               '<button type="button" class="ghost-btn" data-download-schedule-run-markdown="' + escapeHtml(run.deliveryJobId) + '">Markdown 저장</button>' +
             '</div>'
           : '';
@@ -3073,6 +3660,12 @@ export function buildNewsletterAppHtml(
       scheduleRunList.querySelectorAll("button[data-open-schedule-run-html]").forEach((button) => {
         button.addEventListener("click", async () => {
           await openSendLogHtml(button.dataset.openScheduleRunHtml);
+        });
+      });
+
+      scheduleRunList.querySelectorAll("button[data-download-schedule-run-html]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          await downloadSendLogHtml(button.dataset.downloadScheduleRunHtml);
         });
       });
 
@@ -3218,22 +3811,30 @@ export function buildNewsletterAppHtml(
       return "검색 조건";
     }
 
-    async function openHtmlPreview() {
+    async function openHtmlPreview(includeAll) {
       try {
+        if (!includeAll && state.selectedBillIds.size === 0) {
+          throw new Error("선택 항목 HTML 미리보기는 법안을 1건 이상 선택해야 합니다.");
+        }
         const response = await fetch("/api/newsletter/preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(buildNewsletterPayload({
-            includeAll: false,
-            useCurrentPageItems: state.selectedBillIds.size === 0,
+            includeAll,
+            useCurrentPageItems: false,
           })),
         });
         const data = await response.json();
         if (!response.ok) {
           throw new Error(data.error || "미리보기를 생성하지 못했습니다.");
         }
-        previewFrame.srcdoc = data.html;
-        previewModal.classList.add("open");
+        openPreviewModal(
+          data.html,
+          includeAll ? "전체 결과 이메일 HTML 미리보기" : "선택 항목 이메일 HTML 미리보기",
+          includeAll
+            ? "현재 검색 조건으로 조회되는 전체 결과 기준 본문입니다."
+            : ("선택한 법안 " + state.selectedBillIds.size + "건 기준 본문입니다."),
+        );
       } catch (error) {
         setStatus(composerStatus, error.message || "미리보기를 생성하지 못했습니다.", "error");
       }
@@ -3250,8 +3851,32 @@ export function buildNewsletterAppHtml(
           throw new Error(data.error || "발송 HTML 스냅샷을 불러오지 못했습니다.");
         }
         const html = await response.text();
-        previewFrame.srcdoc = html;
-        previewModal.classList.add("open");
+        openPreviewModal(
+          html,
+          "발송 HTML 스냅샷",
+          "이미 발송된 뉴스레터 HTML 본문 스냅샷입니다.",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "발송 HTML 스냅샷을 불러오지 못했습니다.", "error");
+      }
+    }
+
+    async function downloadSendLogHtml(jobId) {
+      try {
+        if (!jobId) {
+          throw new Error("내려받을 발송 로그 jobId가 없습니다.");
+        }
+        const response = await fetch(
+          "/api/newsletter/send-log-artifact?jobId=" +
+          encodeURIComponent(jobId) +
+          "&format=html&download=1",
+        );
+        await downloadResponseFile(
+          response,
+          "sent-newsletter.html",
+          "발송 HTML 스냅샷을 불러오지 못했습니다.",
+        );
+        setStatus(composerStatus, "발송 HTML 스냅샷을 내려받았습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "발송 HTML 스냅샷을 불러오지 못했습니다.", "error");
       }
@@ -3307,6 +3932,142 @@ export function buildNewsletterAppHtml(
       } catch (error) {
         setStatus(composerStatus, error.message || "예약 실행 이력 CSV를 생성하지 못했습니다.", "error");
       }
+    }
+
+    function openPreviewModal(html, title, meta) {
+      previewModalTitle.textContent = title || "이메일 HTML 미리보기";
+      previewModalMeta.textContent = meta || "선택 항목 또는 전체 결과 기준으로 본문을 확인합니다.";
+      previewFrame.srcdoc = html;
+      previewModal.classList.add("open");
+    }
+
+    async function openVercelEnvTemplateModal() {
+      try {
+        const response = await fetch("/api/newsletter/vercel-env-template");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Vercel 환경 변수 템플릿을 불러오지 못했습니다.");
+        }
+        openTemplateModal(
+          "Vercel 환경 변수 템플릿",
+          "Vercel Project Settings -> Environment Variables에 붙여 넣을 수 있는 템플릿입니다.",
+          data.template || "",
+          data.filename || "vercel-newsletter.env",
+          "/api/newsletter/vercel-env-template?download=1",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "Vercel 환경 변수 템플릿을 불러오지 못했습니다.", "error");
+      }
+    }
+
+    async function openVercelDeployChecklistModal() {
+      try {
+        const response = await fetch("/api/newsletter/vercel-deploy-checklist");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Vercel 배포 점검표를 불러오지 못했습니다.");
+        }
+        openTemplateModal(
+          "Vercel 배포 점검표",
+          "배포 직후 무엇을 열고 무엇을 확인해야 하는지 순서대로 정리한 체크리스트입니다.",
+          data.template || "",
+          data.filename || "vercel-deploy-checklist.md",
+          "/api/newsletter/vercel-deploy-checklist?download=1",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "Vercel 배포 점검표를 불러오지 못했습니다.", "error");
+      }
+    }
+
+    async function openGithubActionsCronTemplateModal() {
+      try {
+        const response = await fetch("/api/newsletter/github-actions-cron-template");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "GitHub Actions cron 템플릿을 불러오지 못했습니다.");
+        }
+        openTemplateModal(
+          "GitHub Actions cron 워크플로",
+          "외부 cron 대체용 GitHub Actions 워크플로입니다. .github/workflows/ 에 저장해서 사용할 수 있습니다.",
+          data.template || "",
+          data.filename || "github-actions-newsletter-cron.yml",
+          "/api/newsletter/github-actions-cron-template?download=1",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "GitHub Actions cron 템플릿을 불러오지 못했습니다.", "error");
+      }
+    }
+
+    async function openVercelCronTemplateModal() {
+      try {
+        const response = await fetch("/api/newsletter/vercel-cron-template");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Vercel cron 설정 템플릿을 불러오지 못했습니다.");
+        }
+        openTemplateModal(
+          "Vercel cron 설정 스니펫",
+          "Vercel 플랜에 맞는 crons 설정 예시입니다. Hobby는 하루 1회만 가능하고, 더 촘촘한 주기는 Pro 이상 또는 외부 cron이 필요합니다.",
+          data.template || "",
+          data.filename || "vercel-cron-snippets.txt",
+          "/api/newsletter/vercel-cron-template?download=1",
+        );
+      } catch (error) {
+        setStatus(composerStatus, error.message || "Vercel cron 설정 템플릿을 불러오지 못했습니다.", "error");
+      }
+    }
+
+    function openTemplateModal(title, meta, text, filename, downloadUrl) {
+      state.templateModalText = text || "";
+      state.templateModalFilename = filename || "template.txt";
+      state.templateModalDownloadUrl = downloadUrl || "/api/newsletter/vercel-env-template?download=1";
+      envTemplateTitle.textContent = title || "템플릿";
+      envTemplateMeta.textContent = meta || "";
+      envTemplateText.value = state.templateModalText;
+        envTemplateModal.classList.add("open");
+    }
+
+    async function copyVercelEnvTemplate() {
+      try {
+        if (!state.templateModalText) {
+          await openVercelEnvTemplateModal();
+        }
+        await copyText(state.templateModalText);
+        setStatus(composerStatus, "현재 템플릿을 복사했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "템플릿 복사에 실패했습니다.", "error");
+      }
+    }
+
+    async function downloadVercelEnvTemplate() {
+      try {
+        const response = await fetch(state.templateModalDownloadUrl || "/api/newsletter/vercel-env-template?download=1");
+        await downloadResponseFile(
+          response,
+          state.templateModalFilename || "template.txt",
+          "템플릿을 저장하지 못했습니다.",
+        );
+        setStatus(composerStatus, "현재 템플릿 파일을 저장했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "템플릿을 저장하지 못했습니다.", "error");
+      }
+    }
+
+    async function copyText(value) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(value);
+        return;
+      }
+
+      const textarea = document.createElement("textarea");
+      textarea.value = value;
+      textarea.setAttribute("readonly", "readonly");
+      textarea.style.position = "absolute";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
     }
 
     async function downloadResponseFile(response, fallbackFilename, errorMessage) {
@@ -3535,6 +4296,27 @@ export function buildNewsletterAppHtml(
         setStatus(composerStatus, "Markdown 파일을 생성했습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "Markdown 생성에 실패했습니다.", "error");
+      }
+    }
+
+    async function downloadHtml(includeAll) {
+      try {
+        if (!includeAll && state.selectedBillIds.size === 0) {
+          throw new Error("선택 항목 HTML 저장은 법안을 1건 이상 선택해야 합니다.");
+        }
+        const response = await fetch("/api/newsletter/html", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildNewsletterPayload({ includeAll })),
+        });
+        await downloadResponseFile(
+          response,
+          "legislation-newsletter.html",
+          "HTML 생성에 실패했습니다.",
+        );
+        setStatus(composerStatus, "HTML 파일을 생성했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "HTML 생성에 실패했습니다.", "error");
       }
     }
 
@@ -4142,6 +4924,28 @@ export function buildNewsletterAppHtml(
         if (!state.operationalSummary) {
           operationalSummaryGrid.innerHTML =
             '<div class="summary-empty">' + escapeHtml(error.message || "운영 요약을 불러오지 못했습니다.") + '</div>';
+        }
+      }
+    }
+
+    async function loadRuntimeStatus() {
+      try {
+        const response = await fetch("/api/newsletter/runtime-status");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "실행 환경 상태를 불러오지 못했습니다.");
+        }
+        state.runtimeStatus = data;
+        renderRuntimeStatus();
+      } catch (error) {
+        if (!state.runtimeStatus) {
+          runtimeStatusGrid.innerHTML = createRuntimeCard(
+            "실행 환경",
+            "확인 실패",
+            error.message || "실행 환경 상태를 불러오지 못했습니다.",
+            "warn",
+          );
+          runtimeNoticeList.innerHTML = "";
         }
       }
     }

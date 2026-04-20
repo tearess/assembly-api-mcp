@@ -23,9 +23,15 @@ import {
   ScheduledNewsletterRunStore,
   SentNewsletterStore,
   SendLogStore,
+  updateRecipientEmailReferences,
 } from "../newsletter/persistence.js";
 import { buildNewsletterSubscriptionActivity } from "../newsletter/subscription-activity.js";
 import { buildNewsletterOperationalSummary } from "../newsletter/summary.js";
+import { buildNewsletterRuntimeStatus } from "../newsletter/runtime-status.js";
+import { buildVercelEnvTemplate } from "../newsletter/vercel-env-template.js";
+import { buildGithubActionsCronTemplate } from "../newsletter/github-actions-template.js";
+import { buildVercelCronTemplate } from "../newsletter/vercel-cron-template.js";
+import { buildVercelDeployChecklist } from "../newsletter/vercel-deploy-checklist.js";
 import {
   filterScheduleRuns,
   filterSendLogs,
@@ -36,7 +42,7 @@ import {
   buildMarkdownFilename,
   renderNewsletterMarkdown,
 } from "../newsletter/render-markdown.js";
-import { renderNewsletterHtml } from "../newsletter/render-html.js";
+import { buildHtmlFilename, renderNewsletterHtml } from "../newsletter/render-html.js";
 import { parseLegislationSearchQueryFromParams } from "../newsletter/query-url.js";
 import {
   type LegislationSearchQuery,
@@ -53,7 +59,7 @@ export async function handleNewsletterRequest(
   res: ServerResponse,
   config: AppConfig,
 ): Promise<boolean> {
-  const requestUrl = new URL(req.url ?? "/", "http://localhost");
+  const requestUrl = new URL(req.url ?? "/", getRequestOrigin(req));
   const pathname = requestUrl.pathname;
 
   if (req.method === "GET" && pathname === "/newsletter") {
@@ -111,6 +117,22 @@ export async function handleNewsletterRequest(
         await store.upsertMany(recipients);
       }
       sendJson(res, 200, { items: await store.list() });
+    } catch (error: unknown) {
+      sendJson(res, 400, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "PATCH" && pathname === "/api/recipients") {
+    try {
+      const body = await readRequestBody(req);
+      const previousEmail = normalizeRecipients([asString(body.previousEmail)])[0];
+      const nextEmail = normalizeRecipients([asString(body.nextEmail)])[0];
+      const result = await updateRecipientEmailReferences(previousEmail, nextEmail);
+      const store = new RecipientStore();
+      sendJson(res, 200, { ...result, items: await store.list() });
     } catch (error: unknown) {
       sendJson(res, 400, {
         error: error instanceof Error ? error.message : String(error),
@@ -256,6 +278,97 @@ export async function handleNewsletterRequest(
     return true;
   }
 
+  if (req.method === "GET" && pathname === "/api/newsletter/runtime-status") {
+    try {
+      sendJson(res, 200, buildNewsletterRuntimeStatus(process.env));
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/newsletter/vercel-env-template") {
+    try {
+      const template = buildVercelEnvTemplate(process.env, {
+        origin: requestUrl.origin,
+      });
+      if (requestUrl.searchParams.get("download") === "1") {
+        sendText(res, 200, template.template, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${template.filename}"`,
+        });
+      } else {
+        sendJson(res, 200, template);
+      }
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/newsletter/github-actions-cron-template") {
+    try {
+      const template = buildGithubActionsCronTemplate(requestUrl.origin);
+      if (requestUrl.searchParams.get("download") === "1") {
+        sendText(res, 200, template.template, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${template.filename}"`,
+        });
+      } else {
+        sendJson(res, 200, template);
+      }
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/newsletter/vercel-cron-template") {
+    try {
+      const template = buildVercelCronTemplate();
+      if (requestUrl.searchParams.get("download") === "1") {
+        sendText(res, 200, template.template, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${template.filename}"`,
+        });
+      } else {
+        sendJson(res, 200, template);
+      }
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/newsletter/vercel-deploy-checklist") {
+    try {
+      const template = buildVercelDeployChecklist(process.env, {
+        origin: requestUrl.origin,
+      });
+      if (requestUrl.searchParams.get("download") === "1") {
+        sendText(res, 200, template.template, {
+          "Content-Type": "text/markdown; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${template.filename}"`,
+        });
+      } else {
+        sendJson(res, 200, template);
+      }
+    } catch (error: unknown) {
+      sendJson(res, 500, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
   if (req.method === "GET" && pathname === "/api/newsletter/settings-export") {
     try {
       const bundle = await exportNewsletterSettingsBundle();
@@ -296,6 +409,7 @@ export async function handleNewsletterRequest(
     try {
       const jobId = requestUrl.searchParams.get("jobId") ?? "";
       const format = (requestUrl.searchParams.get("format") ?? "html").trim().toLowerCase();
+      const shouldDownload = parseBooleanFlag(requestUrl.searchParams.get("download"));
       if (!jobId.trim()) {
         throw new Error("조회할 발송 로그 jobId가 필요합니다.");
       }
@@ -310,6 +424,14 @@ export async function handleNewsletterRequest(
       if (format === "markdown") {
         sendText(res, 200, snapshot.markdown, {
           "Content-Disposition": `attachment; filename="${buildMarkdownFilename(snapshot.document)}"`,
+        });
+        return true;
+      }
+
+      if (shouldDownload) {
+        sendText(res, 200, snapshot.html, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${buildHtmlFilename(snapshot.document)}"`,
         });
         return true;
       }
@@ -705,6 +827,25 @@ export async function handleNewsletterRequest(
     return true;
   }
 
+  if (req.method === "POST" && pathname === "/api/newsletter/html") {
+    try {
+      const body = await readRequestBody(req);
+      const payload = normalizeNewsletterContentPayload(body);
+      const document = await buildNewsletterDocumentFromPayload(payload, config);
+      const html = renderNewsletterHtml(document);
+      const filename = buildHtmlFilename(document);
+      sendText(res, 200, html, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      });
+    } catch (error: unknown) {
+      sendJson(res, 400, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
   if (req.method === "POST" && pathname === "/api/newsletter/markdown") {
     try {
       const body = await readRequestBody(req);
@@ -738,6 +879,21 @@ export async function handleNewsletterRequest(
   }
 
   return false;
+}
+
+function getRequestOrigin(req: IncomingMessage): string {
+  const forwardedProto = getHeaderValue(req.headers["x-forwarded-proto"]);
+  const forwardedHost = getHeaderValue(req.headers["x-forwarded-host"]);
+  const host = forwardedHost || getHeaderValue(req.headers.host) || "localhost";
+  const proto = forwardedProto || (host.includes("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+function getHeaderValue(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0]?.trim() || null;
+  }
+  return value?.trim() || null;
 }
 
 function toSearchQuery(input: unknown): LegislationSearchQuery {
@@ -801,6 +957,14 @@ function toSendLogStatus(value: string | null): "sent" | "failed" | "all" {
 
 function toScheduleRunStatus(value: string | null): "sent" | "failed" | "skipped" | "all" {
   return value === "sent" || value === "failed" || value === "skipped" ? value : "all";
+}
+
+function parseBooleanFlag(value: string | null): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

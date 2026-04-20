@@ -1,5 +1,7 @@
 import nodemailer from "nodemailer";
 import { type NewsletterDocument } from "./types.js";
+import { buildHtmlFilename } from "./render-html.js";
+import { buildMarkdownFilename } from "./render-markdown.js";
 
 export interface SmtpSettings {
   readonly host: string;
@@ -15,6 +17,12 @@ export interface EmailSendResult {
   readonly sent: number;
   readonly failed: number;
   readonly failures: readonly { recipient: string; error: string }[];
+}
+
+export interface EmailAttachment {
+  readonly filename: string;
+  readonly content: string;
+  readonly contentType: string;
 }
 
 export function loadSmtpSettings(
@@ -55,7 +63,12 @@ export class SmtpNewsletterEmailSender {
     recipients: readonly string[],
     document: NewsletterDocument,
     html: string,
-    text: string,
+    markdown: string,
+    attachments: readonly EmailAttachment[] = buildNewsletterEmailAttachments(
+      document,
+      html,
+      markdown,
+    ),
   ): Promise<EmailSendResult> {
     const transport = nodemailer.createTransport({
       host: this.settings.host,
@@ -76,7 +89,12 @@ export class SmtpNewsletterEmailSender {
           to: recipient,
           subject: document.subject,
           html,
-          text,
+          text: markdown,
+          attachments: attachments.map((attachment) => ({
+            filename: attachment.filename,
+            content: attachment.content,
+            contentType: attachment.contentType,
+          })),
         });
       } catch (error: unknown) {
         failures.push({
@@ -118,6 +136,25 @@ export function normalizeRecipients(input: unknown): string[] {
   }
 
   return Array.from(unique);
+}
+
+export function buildNewsletterEmailAttachments(
+  document: NewsletterDocument,
+  html: string,
+  markdown: string,
+): readonly EmailAttachment[] {
+  return [
+    {
+      filename: buildHtmlFilename(document),
+      content: html,
+      contentType: "text/html; charset=utf-8",
+    },
+    {
+      filename: buildMarkdownFilename(document),
+      content: markdown,
+      contentType: "text/markdown; charset=utf-8",
+    },
+  ];
 }
 
 function isValidEmail(value: string): boolean {

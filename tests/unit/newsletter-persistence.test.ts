@@ -13,6 +13,7 @@ import {
   ScheduledNewsletterRunStore,
   SentNewsletterStore,
   SendLogStore,
+  updateRecipientEmailReferences,
 } from "../../src/newsletter/persistence.js";
 import {
   type NewsletterDocument,
@@ -111,6 +112,79 @@ describe("newsletter/persistence", () => {
 
       const items = await store.list();
       expect(items.map((item) => item.email)).toEqual([
+        "beta@example.com",
+        "gamma@example.com",
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("수신자 이메일을 수정하면 그룹, 구독, 예약 스냅샷까지 함께 갱신한다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assembly-newsletter-"));
+
+    try {
+      const recipientStore = new RecipientStore(dir);
+      const groupStore = new RecipientGroupStore(dir);
+      const subscriptionStore = new NewsletterSubscriptionStore(dir);
+      const scheduleStore = new ScheduledNewsletterJobStore(dir);
+
+      await recipientStore.upsertMany(["alpha@example.com", "beta@example.com"]);
+      await groupStore.upsert("정책팀 전체", [
+        "alpha@example.com",
+        "beta@example.com",
+      ]);
+      await subscriptionStore.upsert("AI 정책 구독", {
+        query: {
+          keyword: "인공지능",
+          datePreset: "1m",
+          dateFrom: null,
+          dateTo: null,
+          noticeScope: "include_closed",
+          sortBy: "relevance",
+          pageSize: 20,
+        },
+        recipientGroupId: null,
+        recipientGroupName: null,
+        searchPresetId: null,
+        searchPresetName: null,
+        recipients: ["alpha@example.com", "beta@example.com"],
+        subject: "[입법예고 뉴스레터] AI 정책 브리핑",
+        introText: null,
+        outroText: null,
+        recurrence: "weekly",
+        onlyNewResults: false,
+      });
+      await scheduleStore.create(createSendPayload(), "2099-01-01T09:00", "daily");
+
+      const result = await updateRecipientEmailReferences(
+        "alpha@example.com",
+        "gamma@example.com",
+        dir,
+      );
+
+      expect(result).toMatchObject({
+        updated: true,
+        previousEmail: "alpha@example.com",
+        nextEmail: "gamma@example.com",
+        recipientGroupsUpdated: 1,
+        subscriptionTemplatesUpdated: 1,
+        scheduledJobsUpdated: 1,
+      });
+
+      expect((await recipientStore.list()).map((item) => item.email)).toEqual([
+        "beta@example.com",
+        "gamma@example.com",
+      ]);
+      expect((await groupStore.list())[0]?.emails).toEqual([
+        "beta@example.com",
+        "gamma@example.com",
+      ]);
+      expect((await subscriptionStore.list())[0]?.recipients).toEqual([
+        "beta@example.com",
+        "gamma@example.com",
+      ]);
+      expect((await scheduleStore.list())[0]?.payload.recipients).toEqual([
         "beta@example.com",
         "gamma@example.com",
       ]);

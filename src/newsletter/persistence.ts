@@ -1,6 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   type NewsletterSendPayload,
@@ -18,8 +16,12 @@ import {
   type ScheduledNewsletterJobRunStatus,
   type SendLogRecord,
 } from "./types.js";
+import {
+  readNewsletterDataText,
+  resolveNewsletterDataDir,
+  writeNewsletterDataText,
+} from "./storage.js";
 
-const DEFAULT_DATA_DIR = ".newsletter-data";
 const RECIPIENTS_FILE = "recipients.json";
 const RECIPIENT_GROUPS_FILE = "recipient-groups.json";
 const SEND_LOGS_FILE = "send-logs.json";
@@ -36,14 +38,13 @@ const ACTIVE_DUPLICATE_SCHEDULE_STATUSES = new Set([
   "failed",
 ]);
 
-export function resolveNewsletterDataDir(
-  env: NodeJS.ProcessEnv = process.env,
-): string {
-  const override = env["NEWSLETTER_DATA_DIR"]?.trim();
-  if (override) {
-    return resolve(override);
-  }
-  return resolve(process.cwd(), DEFAULT_DATA_DIR);
+export interface RecipientEmailUpdateResult {
+  readonly updated: boolean;
+  readonly previousEmail: string;
+  readonly nextEmail: string;
+  readonly recipientGroupsUpdated: number;
+  readonly subscriptionTemplatesUpdated: number;
+  readonly scheduledJobsUpdated: number;
 }
 
 export async function exportNewsletterSettingsBundle(
@@ -92,6 +93,146 @@ export async function importNewsletterSettingsBundle(
   ]);
 
   return bundle;
+}
+
+export async function updateRecipientEmailReferences(
+  previousEmail: string,
+  nextEmail: string,
+  dataDir: string = resolveNewsletterDataDir(),
+): Promise<RecipientEmailUpdateResult> {
+  const normalizedPreviousEmail = normalizeEmail(previousEmail);
+  const normalizedNextEmail = normalizeEmail(nextEmail);
+
+  if (!normalizedPreviousEmail || !normalizedNextEmail) {
+    throw new Error("수정할 이메일과 새 이메일이 모두 필요합니다.");
+  }
+
+  if (normalizedPreviousEmail === normalizedNextEmail) {
+    return {
+      updated: false,
+      previousEmail: normalizedPreviousEmail,
+      nextEmail: normalizedNextEmail,
+      recipientGroupsUpdated: 0,
+      subscriptionTemplatesUpdated: 0,
+      scheduledJobsUpdated: 0,
+    };
+  }
+
+  const recipientFilePath = resolve(dataDir, RECIPIENTS_FILE);
+  const existingRecipients = await readJsonArray<RecipientRecord>(recipientFilePath);
+  const normalizedRecipients = existingRecipients.map((item) => normalizeRecipientRecord(item));
+  if (!normalizedRecipients.some((item) => item.email === normalizedPreviousEmail)) {
+    return {
+      updated: false,
+      previousEmail: normalizedPreviousEmail,
+      nextEmail: normalizedNextEmail,
+      recipientGroupsUpdated: 0,
+      subscriptionTemplatesUpdated: 0,
+      scheduledJobsUpdated: 0,
+    };
+  }
+
+  const now = formatNowKst();
+  const recipientByEmail = new Map<string, RecipientRecord>();
+  for (const item of normalizedRecipients) {
+    if (item.email === normalizedPreviousEmail) {
+      continue;
+    }
+    recipientByEmail.set(item.email, item);
+  }
+
+  const existingNextRecipient = recipientByEmail.get(normalizedNextEmail);
+  recipientByEmail.set(normalizedNextEmail, {
+    email: normalizedNextEmail,
+    createdAt: existingNextRecipient?.createdAt
+      ?? normalizedRecipients.find((item) => item.email === normalizedPreviousEmail)?.createdAt
+      ?? now,
+    updatedAt: now,
+  });
+
+  await writeJsonArray(
+    recipientFilePath,
+    Array.from(recipientByEmail.values()).sort((left, right) => left.email.localeCompare(right.email)),
+  );
+
+  const recipientGroupFilePath = resolve(dataDir, RECIPIENT_GROUPS_FILE);
+  const recipientGroups = (await readJsonArray<RecipientGroupRecord>(recipientGroupFilePath))
+    .map((item) => normalizeRecipientGroupRecord(item));
+  let recipientGroupsUpdated = 0;
+  const nextRecipientGroups = recipientGroups.map((group) => {
+    const nextEmails = replaceEmailInList(group.emails, normalizedPreviousEmail, normalizedNextEmail);
+    if (areNormalizedListsEqual(nextEmails, group.emails)) {
+      return group;
+    }
+    recipientGroupsUpdated += 1;
+    return {
+      ...group,
+      emails: nextEmails,
+      updatedAt: now,
+    };
+  });
+  if (recipientGroupsUpdated > 0) {
+    await writeJsonArray(recipientGroupFilePath, nextRecipientGroups);
+  }
+
+  const subscriptionFilePath = resolve(dataDir, NEWSLETTER_SUBSCRIPTIONS_FILE);
+  const subscriptions = (await readJsonArray<SavedNewsletterSubscriptionRecord>(subscriptionFilePath))
+    .map((item) => normalizeNewsletterSubscriptionRecord(item));
+  let subscriptionTemplatesUpdated = 0;
+  const nextSubscriptions = subscriptions.map((subscription) => {
+    const nextRecipients = replaceEmailInList(
+      subscription.recipients,
+      normalizedPreviousEmail,
+      normalizedNextEmail,
+    );
+    if (areNormalizedListsEqual(nextRecipients, subscription.recipients)) {
+      return subscription;
+    }
+    subscriptionTemplatesUpdated += 1;
+    return {
+      ...subscription,
+      recipients: nextRecipients,
+      updatedAt: now,
+    };
+  });
+  if (subscriptionTemplatesUpdated > 0) {
+    await writeJsonArray(subscriptionFilePath, nextSubscriptions);
+  }
+
+  const scheduledJobsFilePath = resolve(dataDir, SCHEDULED_JOBS_FILE);
+  const scheduledJobs = await readScheduledJobArray(scheduledJobsFilePath);
+  let scheduledJobsUpdated = 0;
+  const nextScheduledJobs = scheduledJobs.map((job) => {
+    const nextRecipients = replaceEmailInList(
+      job.payload.recipients,
+      normalizedPreviousEmail,
+      normalizedNextEmail,
+    );
+    if (areNormalizedListsEqual(nextRecipients, job.payload.recipients)) {
+      return job;
+    }
+    scheduledJobsUpdated += 1;
+    return {
+      ...job,
+      payload: normalizeNewsletterSendPayload({
+        ...job.payload,
+        recipients: nextRecipients,
+      }),
+      updatedAt: now,
+    };
+  });
+  if (scheduledJobsUpdated > 0) {
+    await writeJsonArray(scheduledJobsFilePath, nextScheduledJobs);
+  }
+
+  return {
+    updated: true,
+    previousEmail: normalizedPreviousEmail,
+    nextEmail: normalizedNextEmail,
+    recipientGroupsUpdated,
+    subscriptionTemplatesUpdated,
+    scheduledJobsUpdated,
+  };
 }
 
 export class RecipientStore {
@@ -405,8 +546,7 @@ export class SentNewsletterStore {
     };
 
     const filePath = resolve(this.dataDir, SENT_SNAPSHOTS_DIR, `${normalizedJobId}.json`);
-    await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, JSON.stringify(record, null, 2) + "\n", "utf-8");
+    await writeNewsletterDataText(filePath, JSON.stringify(record, null, 2) + "\n");
     return record;
   }
 
@@ -417,12 +557,12 @@ export class SentNewsletterStore {
     }
 
     const filePath = resolve(this.dataDir, SENT_SNAPSHOTS_DIR, `${normalizedJobId}.json`);
-    if (!existsSync(filePath)) {
+    const raw = await readNewsletterDataText(filePath);
+    if (!raw) {
       return null;
     }
 
     try {
-      const raw = await readFile(filePath, "utf-8");
       const parsed = JSON.parse(raw) as unknown;
       return isSentNewsletterSnapshotRecord(parsed) ? parsed : null;
     } catch {
@@ -944,11 +1084,11 @@ export class ScheduledNewsletterJobStore {
 }
 
 async function readJsonArray<T>(filePath: string): Promise<T[]> {
-  if (!existsSync(filePath)) {
+  const raw = await readNewsletterDataText(filePath);
+  if (!raw) {
     return [];
   }
 
-  const raw = await readFile(filePath, "utf-8");
   if (!raw.trim()) {
     return [];
   }
@@ -970,8 +1110,7 @@ async function writeJsonArray<T>(
   filePath: string,
   items: readonly T[],
 ): Promise<void> {
-  await mkdir(dirname(filePath), { recursive: true });
-  await writeFile(filePath, JSON.stringify(items, null, 2) + "\n", "utf-8");
+  await writeNewsletterDataText(filePath, JSON.stringify(items, null, 2) + "\n");
 }
 
 function normalizeEmail(value: string): string {
@@ -1586,6 +1725,35 @@ function normalizeRecipientList(recipients: readonly string[] | null | undefined
       .map((recipient) => normalizeEmail(recipient))
       .filter(Boolean),
   );
+}
+
+function replaceEmailInList(
+  recipients: readonly string[] | null | undefined,
+  previousEmail: string,
+  nextEmail: string,
+): string[] {
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    return [];
+  }
+
+  return normalizeRecipientList(
+    recipients.map((recipient) =>
+      normalizeEmail(recipient) === previousEmail ? nextEmail : recipient
+    ),
+  );
+}
+
+function areNormalizedListsEqual(
+  left: readonly string[] | null | undefined,
+  right: readonly string[] | null | undefined,
+): boolean {
+  const normalizedLeft = normalizeRecipientList(left);
+  const normalizedRight = normalizeRecipientList(right);
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+
+  return normalizedLeft.every((value, index) => value === normalizedRight[index]);
 }
 
 function sortNormalizedValues(values: readonly string[] | null | undefined): string[] {

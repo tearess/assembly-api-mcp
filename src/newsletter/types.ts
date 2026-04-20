@@ -203,6 +203,22 @@ export interface NewsletterOperationalSummary {
   };
 }
 
+export interface NewsletterRuntimeStatus {
+  readonly asOf: string;
+  readonly platform: "local" | "vercel";
+  readonly platformLabel: string;
+  readonly apiKeyConfigured: boolean;
+  readonly storageMode: "local" | "local-tmp" | "vercel-blob";
+  readonly storageLabel: string;
+  readonly persistentStorage: boolean;
+  readonly smtpConfigured: boolean;
+  readonly cronSecretConfigured: boolean;
+  readonly missingEnvKeys: readonly string[];
+  readonly recommendedActions: readonly string[];
+  readonly warnings: readonly string[];
+  readonly notes: readonly string[];
+}
+
 export interface NewsletterSettingsBundle {
   readonly version: 1;
   readonly exportedAt: string;

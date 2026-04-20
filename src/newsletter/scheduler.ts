@@ -35,10 +35,10 @@ export class NewsletterScheduleProcessor {
       );
     }
 
-    await this.tick();
+    await this.runDueJobsOnce();
 
     this.timer = setInterval(() => {
-      void this.tick();
+      void this.runDueJobsOnce();
     }, this.pollIntervalMs);
     this.timer.unref();
   }
@@ -54,14 +54,29 @@ export class NewsletterScheduleProcessor {
     }
   }
 
-  private async tick(): Promise<void> {
+  async runDueJobsOnce(
+    limit = 5,
+  ): Promise<{
+    readonly processed: number;
+    readonly sent: number;
+    readonly skipped: number;
+    readonly failed: number;
+  }> {
+    const summary = {
+      processed: 0,
+      sent: 0,
+      skipped: 0,
+      failed: 0,
+    };
+
     if (this.running) {
-      return;
+      return summary;
     }
 
     this.running = true;
     try {
-      const dueJobs = await this.store.claimDueJobs(new Date(), 5);
+      const dueJobs = await this.store.claimDueJobs(new Date(), limit);
+      summary.processed = dueJobs.length;
       for (const job of dueJobs) {
         try {
           const payload = job.payload.onlyNewResults
@@ -93,6 +108,7 @@ export class NewsletterScheduleProcessor {
           process.stderr.write(
             `[assembly-api-mcp] 예약 발송 완료: ${job.id}\n`,
           );
+          summary.sent += 1;
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
           if (isEmptyNewsletterError(error)) {
@@ -115,6 +131,7 @@ export class NewsletterScheduleProcessor {
             process.stderr.write(
               `[assembly-api-mcp] 예약 발송 건너뜀: ${job.id} - ${skipMessage}\n`,
             );
+            summary.skipped += 1;
             continue;
           }
           await this.store.markFailed(job.id, message);
@@ -133,11 +150,18 @@ export class NewsletterScheduleProcessor {
           process.stderr.write(
             `[assembly-api-mcp] 예약 발송 실패: ${job.id} - ${message}\n`,
           );
+          summary.failed += 1;
         }
       }
     } finally {
       this.running = false;
     }
+
+    return summary;
+  }
+
+  private async tick(): Promise<void> {
+    await this.runDueJobsOnce();
   }
 
   private async appendRunLog(

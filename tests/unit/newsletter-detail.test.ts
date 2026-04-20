@@ -76,6 +76,8 @@ describe("newsletter/detail", () => {
       billNo: "2200001",
       proposalDate: "2099-04-15",
       noticeStatusLabel: "입법예고 진행중",
+      proposalReason: "산업 기반을 정비하기 위한 제안이유",
+      mainContent: "지원 근거를 명확히 하고 위험도 평가 체계를 신설합니다.",
     });
     expect(detail?.reviewEvents).toEqual([
       {

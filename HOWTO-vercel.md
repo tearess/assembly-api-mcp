@@ -1,0 +1,506 @@
+# HOWTO-vercel
+
+이 문서는 이 프로그램을 **Vercel에 올리는 방법**을 아주 쉽게 설명합니다.
+
+어렵게 생각하지 않아도 됩니다.
+정말로 **순서대로 하나씩** 하면 됩니다.
+
+이 문서는 특히 이런 사람을 위해 썼습니다.
+
+- Vercel이 처음인 사람
+- 배포라는 말을 들어는 봤지만 아직 낯선 사람
+- 그냥 인터넷 주소로 이 프로그램을 열고 싶은 사람
+
+---
+
+## 0. 이 문서의 목표
+
+우리가 하고 싶은 일은 딱 이것입니다.
+
+1. 이 프로젝트를 GitHub에 올립니다.
+2. Vercel이 그 프로젝트를 가져가게 합니다.
+3. 필요한 비밀값을 넣습니다.
+4. 배포 버튼을 누릅니다.
+5. 브라우저에서 `https://내주소.vercel.app/newsletter` 를 엽니다.
+
+---
+
+## 1. 먼저 아주 쉽게 말해 볼게요
+
+처음 보면 단어가 어려울 수 있어서, 먼저 뜻부터 쉽게 설명하겠습니다.
+
+### 1-1. GitHub가 뭐예요?
+
+GitHub는 **인터넷에 올려 두는 프로젝트 보관함**이라고 생각하면 됩니다.
+
+### 1-2. Vercel이 뭐예요?
+
+Vercel은 GitHub에 있는 프로젝트를 보고,
+그것을 **인터넷에서 열 수 있는 사이트**로 바꿔 주는 서비스입니다.
+
+### 1-3. 환경 변수는 뭐예요?
+
+환경 변수는 프로그램이 알아야 하는 **비밀 메모**입니다.
+
+예를 들면:
+
+- 국회 API 키
+- 이메일 보내는 서버 정보
+- 예약 발송 보호용 비밀 문자열
+
+이런 것들을 적어 두는 곳입니다.
+
+---
+
+## 2. 먼저 준비할 것
+
+아래 것들이 있으면 됩니다.
+
+1. GitHub 계정
+2. Vercel 계정
+3. 열린국회정보 API 키
+4. 이 프로젝트가 들어 있는 GitHub 저장소
+
+### 2-1. 가장 중요한 것
+
+이 프로그램은 법안 정보를 읽으려면 `ASSEMBLY_API_KEY`가 꼭 필요합니다.
+
+이 값이 없으면:
+
+- 검색이 안 될 수 있고
+- 상세 보기 정보가 안 나올 수 있습니다
+
+이미 API 키를 가지고 있다면 아주 잘 준비된 것입니다.
+
+---
+
+## 3. 지금 가장 쉬운 성공 방법
+
+처음이라면 아래 순서가 가장 쉽습니다.
+
+1. 먼저 **배포만 성공**시킵니다.
+2. 그다음 **검색이 되는지** 확인합니다.
+3. 그다음 **이메일 발송**을 붙입니다.
+4. 마지막에 **예약 발송**을 붙입니다.
+
+처음부터 모든 기능을 한 번에 완벽하게 하려고 하면 더 헷갈릴 수 있습니다.
+
+---
+
+## 4. GitHub에 올리기
+
+이미 GitHub에 이 프로젝트가 올라가 있으면 이 부분은 건너뛰어도 됩니다.
+
+### 4-1. 왜 GitHub에 먼저 올려야 하나요?
+
+Vercel은 보통 GitHub에 있는 프로젝트를 가져와서 배포합니다.
+
+즉:
+
+- GitHub = 원본
+- Vercel = 인터넷용 실행판
+
+이라고 생각하면 됩니다.
+
+### 4-2. 이미 올라가 있는지 확인하기
+
+GitHub에서 저장소 페이지를 열었을 때:
+
+- 이 프로젝트 파일들이 보이면 이미 올라간 것입니다
+- 안 보이면 먼저 올려야 합니다
+
+### 4-3. 처음 올리는 아주 쉬운 흐름
+
+보통은 IDE의 Git 기능으로 올리거나, 터미널에서 올립니다.
+
+터미널로 한다면 보통 이런 흐름입니다.
+
+```bash
+git add .
+git commit -m "prepare vercel deployment"
+git push origin main
+```
+
+중요:
+
+- 이미 GitHub에 연결된 저장소라는 가정입니다
+- 이 부분이 낯설면 GitHub Desktop이나 VS Code의 Source Control 메뉴를 써도 됩니다
+
+---
+
+## 5. Vercel에서 프로젝트 가져오기
+
+이제 Vercel로 갑니다.
+
+### 5-1. Vercel 로그인
+
+1. 브라우저를 엽니다.
+2. `https://vercel.com` 으로 갑니다.
+3. 로그인합니다.
+
+### 5-2. 새 프로젝트 만들기
+
+로그인한 뒤 아래 순서로 누릅니다.
+
+1. `Add New...`
+2. `Project`
+3. GitHub 저장소 목록에서 이 프로젝트를 찾습니다
+4. `Import` 를 누릅니다
+
+### 5-3. 겁먹지 않아도 되는 이유
+
+이 프로젝트에는 이미 Vercel용 설정 파일이 들어 있습니다.
+
+그래서 보통은:
+
+- 빌드 명령어를 직접 많이 만질 필요가 없고
+- 함수 경로를 직접 만들 필요도 없고
+- `/newsletter` 화면도 이미 열 수 있게 준비되어 있습니다
+
+---
+
+## 6. 제일 중요한 단계: 환경 변수 넣기
+
+이 단계가 제일 중요합니다.
+
+Vercel 프로젝트 화면에서 아래로 들어갑니다.
+
+1. `Settings`
+2. `Environment Variables`
+
+여기에 필요한 값을 하나씩 넣으면 됩니다.
+
+### 6-1. 가장 최소한으로 필요한 것
+
+아래 2개는 거의 꼭 필요합니다.
+
+```env
+ASSEMBLY_API_KEY=여기에_당신의_API_키
+MCP_PROFILE=lite
+```
+
+설명:
+
+- `ASSEMBLY_API_KEY`
+  국회 데이터를 읽는 데 필요합니다
+- `MCP_PROFILE=lite`
+  이 프로젝트에서 권장하는 기본값입니다
+
+### 6-2. 이메일 발송까지 하고 싶다면
+
+이메일을 실제로 보내고 싶다면 아래 값도 넣어야 합니다.
+
+```env
+NEWSLETTER_SMTP_HOST=smtp.example.com
+NEWSLETTER_SMTP_PORT=465
+NEWSLETTER_SMTP_SECURE=true
+NEWSLETTER_SMTP_USER=your-account
+NEWSLETTER_SMTP_PASS=your-password
+NEWSLETTER_SMTP_FROM_EMAIL=no-reply@example.com
+NEWSLETTER_SMTP_FROM_NAME=입법예고 뉴스레터
+```
+
+쉽게 말하면:
+
+- 어떤 메일 서버를 쓸지
+- 어떤 아이디로 로그인할지
+- 누구 이름으로 보낼지
+
+를 적는 것입니다.
+
+### 6-3. 저장 데이터가 안 사라지게 하고 싶다면
+
+이 부분도 아주 중요합니다.
+
+Vercel은 그냥 두면 저장을 임시 폴더에 할 수 있습니다.
+그러면:
+
+- 저장한 수신자
+- 저장한 검색 preset
+- 예약 발송 정보
+
+같은 것이 나중에 사라질 수 있습니다.
+
+그래서 안정적으로 쓰려면 아래 값들을 넣는 것이 좋습니다.
+
+```env
+NEWSLETTER_STORAGE_BACKEND=vercel-blob
+NEWSLETTER_BLOB_PREFIX=newsletter-data
+BLOB_READ_WRITE_TOKEN=여기에_Vercel_Blob_토큰
+```
+
+쉽게 말하면:
+
+- `vercel-blob` = 인터넷에 안전하게 저장하는 창고
+- `BLOB_READ_WRITE_TOKEN` = 그 창고의 열쇠
+
+입니다.
+
+### 6-4. 예약 발송을 안전하게 쓰고 싶다면
+
+아래 값도 추천합니다.
+
+```env
+CRON_SECRET=아주_길고_아무도_모를_문자열
+NEWSLETTER_CRON_CLAIM_LIMIT=5
+```
+
+설명:
+
+- `CRON_SECRET`
+  예약 발송 주소를 아무나 막 두드리지 못하게 막아 주는 비밀번호 같은 값
+- `NEWSLETTER_CRON_CLAIM_LIMIT=5`
+  한 번에 몇 개 작업을 처리할지 정하는 값
+
+### 6-5. 가장 추천하는 복붙용 예시
+
+처음부터 조금 안정적으로 쓰고 싶다면 이 묶음을 기준으로 생각하면 됩니다.
+
+```env
+ASSEMBLY_API_KEY=여기에_당신의_API_키
+MCP_PROFILE=lite
+NEWSLETTER_STORAGE_BACKEND=vercel-blob
+NEWSLETTER_BLOB_PREFIX=newsletter-data
+BLOB_READ_WRITE_TOKEN=여기에_Vercel_Blob_토큰
+NEWSLETTER_SMTP_HOST=smtp.example.com
+NEWSLETTER_SMTP_PORT=465
+NEWSLETTER_SMTP_SECURE=true
+NEWSLETTER_SMTP_USER=your-account
+NEWSLETTER_SMTP_PASS=your-password
+NEWSLETTER_SMTP_FROM_EMAIL=no-reply@example.com
+NEWSLETTER_SMTP_FROM_NAME=입법예고 뉴스레터
+CRON_SECRET=아주_길고_랜덤한_문자열
+NEWSLETTER_CRON_CLAIM_LIMIT=5
+```
+
+---
+
+## 7. 이제 배포 버튼 누르기
+
+환경 변수를 다 넣었으면 이제 배포할 수 있습니다.
+
+보통은:
+
+1. `Deploy`
+2. 잠깐 기다리기
+3. 완료 메시지 보기
+
+이 순서로 진행됩니다.
+
+성공하면 Vercel이 인터넷 주소를 하나 줍니다.
+
+예:
+
+```text
+https://my-assembly-news.vercel.app
+```
+
+---
+
+## 8. 배포가 끝나면 어디로 들어가나요?
+
+이 프로젝트는 메인 화면이 `/newsletter` 입니다.
+
+그래서 아래 주소로 들어가면 됩니다.
+
+```text
+https://내-프로젝트-주소.vercel.app/newsletter
+```
+
+상태 확인용 주소는 이것입니다.
+
+```text
+https://내-프로젝트-주소.vercel.app/health
+```
+
+쉽게 기억하는 법:
+
+- `/newsletter` = 실제 쓰는 화면
+- `/health` = 살아 있는지 보는 주소
+
+---
+
+## 9. 배포 직후 가장 먼저 해야 할 확인
+
+배포가 끝났다고 바로 완전히 끝난 것은 아닙니다.
+아래 순서로 확인하면 됩니다.
+
+1. `/health` 를 열어 봅니다
+2. `/newsletter` 를 열어 봅니다
+3. 키워드를 넣고 검색해 봅니다
+4. HTML 미리보기를 눌러 봅니다
+5. 저장 기능이 있으면 새로고침 뒤에도 남는지 봅니다
+
+### 9-1. 화면 안에서 꼭 볼 것
+
+`/newsletter` 화면 상단에는 `실행 환경 상태`가 나옵니다.
+
+여기서 아래를 확인하면 됩니다.
+
+- 실행 환경
+- API 키
+- 저장소
+- 이메일 발송
+- 예약 보호
+
+### 9-2. 아주 편한 버튼들
+
+이 화면에는 Vercel 배포를 도와주는 버튼도 있습니다.
+
+- `Vercel 환경 변수 보기`
+- `Vercel cron 설정 보기`
+- `GitHub Actions cron 보기`
+- `Vercel 배포 점검 보기`
+
+이 버튼들은:
+
+- 무엇이 빠졌는지 보고
+- 어떤 값을 넣어야 하는지 보고
+- 예약 발송을 어떻게 자동으로 돌릴지 보고
+- 배포 직후 무엇을 확인할지 보는 데 도움을 줍니다
+
+---
+
+## 10. 이메일 발송이 안 되면 어디를 보면 되나요?
+
+보통은 SMTP 값이 비어 있거나 잘못된 경우가 많습니다.
+
+먼저 아래를 확인하세요.
+
+1. `NEWSLETTER_SMTP_HOST`
+2. `NEWSLETTER_SMTP_PORT`
+3. `NEWSLETTER_SMTP_USER`
+4. `NEWSLETTER_SMTP_PASS`
+5. `NEWSLETTER_SMTP_FROM_EMAIL`
+
+그리고 `/newsletter` 화면에서 `이메일 발송` 카드가
+`준비 완료`인지 확인하세요.
+
+처음에는 꼭 **자기 이메일 1개만 넣고 테스트**해 보는 것이 좋습니다.
+
+---
+
+## 11. 저장한 내용이 사라지면 어디를 보면 되나요?
+
+이 경우는 보통 저장소 설정이 부족할 때가 많습니다.
+
+확인할 것:
+
+1. `NEWSLETTER_STORAGE_BACKEND=vercel-blob` 인지
+2. `BLOB_READ_WRITE_TOKEN` 이 들어 있는지
+3. 화면의 `저장소` 카드가 좋은 상태로 보이는지
+
+쉽게 말하면:
+
+- Blob이 없으면 저장이 불안정할 수 있고
+- Blob이 있으면 저장이 훨씬 안정적입니다
+
+---
+
+## 12. 예약 발송은 왜 바로 자동으로 안 돌아가나요?
+
+이 부분도 처음엔 헷갈릴 수 있습니다.
+
+예약 발송은 단순히 “예약 목록에 저장”만 한다고 끝나지 않습니다.
+
+정해진 시간마다 아래 주소를 누군가 불러 줘야 합니다.
+
+```text
+https://내-프로젝트-주소.vercel.app/cron/newsletter
+```
+
+그래야 예약 시간이 되었는지 확인하고 메일을 보냅니다.
+
+### 12-1. 가장 쉬운 이해
+
+이 주소는 쉽게 말하면:
+
+“예약된 일이 있는지 확인해 줘”
+
+라고 말하는 버튼 같은 것입니다.
+
+### 12-2. 어떻게 자동으로 누르게 하나요?
+
+방법은 크게 2가지입니다.
+
+1. Vercel cron 사용
+2. GitHub Actions 같은 외부 cron 사용
+
+### 12-3. 초보자에게 더 쉬운 방법
+
+처음이라면 이 순서가 좋습니다.
+
+1. 먼저 예약 발송 없이 수동 발송이 잘 되는지 확인합니다
+2. 그다음 `GitHub Actions cron 보기` 버튼으로 예시를 봅니다
+3. 익숙해지면 Vercel cron도 붙입니다
+
+---
+
+## 13. 아주 쉬운 추천 순서
+
+정말 처음이라면 이 순서대로 하세요.
+
+1. `ASSEMBLY_API_KEY`만 넣고 먼저 배포
+2. `/newsletter` 화면이 열리는지 확인
+3. 검색이 되는지 확인
+4. 그다음 SMTP 넣기
+5. 자기 이메일로 테스트 발송
+6. 그다음 Blob 넣기
+7. 마지막에 예약 발송 자동화 붙이기
+
+이렇게 하면 어디에서 문제가 생겼는지 찾기 쉽습니다.
+
+---
+
+## 14. 가장 자주 만나는 문제
+
+### 14-1. 화면은 열리는데 검색이 안 돼요
+
+가장 먼저 `ASSEMBLY_API_KEY`를 확인하세요.
+
+### 14-2. 메일이 안 가요
+
+SMTP 값이 비어 있거나 틀렸을 가능성이 큽니다.
+
+### 14-3. 저장한 수신자가 사라져요
+
+`vercel-blob` 설정이 없을 수 있습니다.
+
+### 14-4. 예약 발송이 안 와요
+
+`/cron/newsletter` 를 자동으로 호출하는 설정이 아직 없을 수 있습니다.
+
+### 14-5. 메인 주소만 열면 다른 화면이 보여요
+
+이 프로젝트는 보통 아래 주소로 들어가면 됩니다.
+
+```text
+https://내-프로젝트-주소.vercel.app/newsletter
+```
+
+---
+
+## 15. 제일 쉽게 기억하는 한 줄 정리
+
+아주 짧게 말하면 이렇습니다.
+
+1. GitHub에 올린다
+2. Vercel에서 가져온다
+3. `ASSEMBLY_API_KEY` 넣는다
+4. 배포한다
+5. `/newsletter` 로 들어간다
+
+그리고 저장, 이메일, 예약 발송은 나중에 하나씩 붙이면 됩니다.
+
+---
+
+## 16. 더 자세한 문서도 있어요
+
+조금 더 기술적인 설명이 보고 싶다면 아래 문서를 보면 됩니다.
+
+- [VERCEL.md](VERCEL.md)
+- [HOWTO.md](HOWTO.md)
+- [QUICK_START.md](QUICK_START.md)
+
+이 문서는 “정말 쉬운 설명”용이고,
+위 문서들은 “조금 더 자세한 설명”용입니다.
