@@ -259,22 +259,22 @@ http://localhost:3000/newsletter
 - 상세 미리보기에서 의안번호, 제안일, 입법예고 상태, 관련도, 제안이유, 주요내용 확인
 - 상세 보기 모달에서 심사 이력과 접수/처리 이력 확인
 - 같은 검색 조건과 상세 보기 요청은 프로세스 내 TTL 캐시 재사용
-- 메일 제목, 브리핑 메모, 마무리 문구 편집
+- 문서 제목, 브리핑 메모, 마무리 문구 편집
 - 선택 항목 또는 전체 결과 기준 HTML 파일 저장
-- 이메일 발송 시 같은 뉴스레터를 HTML, Markdown 첨부파일로 함께 전송
+- 선택 항목 또는 전체 결과 기준 Markdown, HWPX 파일 저장
 - 현재 수신자 목록을 수신자 그룹으로 저장, 다시 불러오기, 추가하기, 삭제
 - 저장된 이메일 주소 수정 시 수신자 그룹, 구독 템플릿, 예약 발송 수신자 스냅샷도 함께 갱신
 - 검색 조건 + 수신자 + 발송 옵션을 구독 템플릿으로 저장, 다시 불러오기, 바로 예약
 - 발의 의원/상임위 필터도 preset, 구독 템플릿, 예약, HTML/Markdown에 함께 반영
-- 저장된 구독 템플릿으로 즉시 이메일 발송 또는 Markdown 저장
+- 저장된 구독 템플릿으로 Markdown 또는 HWPX 저장
 - 구독 템플릿 카드에서 연결 예약 수와 최근 결과 확인, 최근 발송 HTML/Markdown 바로 열기
 - 구독 템플릿 이름/키워드 검색과 상태 필터로 빠르게 찾기
 - 수신자, 수신자 그룹, 검색 preset, 구독 템플릿 설정 백업/복원
 - 구독 템플릿/예약 발송에서 저장된 수신자 그룹을 연결해 최신 그룹 멤버 반영
 - 수신자 수, 활성 예약, 최근 7일 예약 성공/실패 요약 카드 확인
-- 선택 항목 또는 전체 결과 기준 HTML 이메일 미리보기
+- 선택 항목 또는 전체 결과 기준 HTML 미리보기
 - Markdown 다운로드
-- 다중 이메일 수신자 발송
+- HWPX 다운로드
 - 발송 로그에서 보낸 HTML/Markdown 스냅샷 다시 확인, HTML/Markdown 저장
 - 발송 로그/예약 실행 이력 검색, 상태 필터, 현재 보기 CSV 저장
 - 발송 로그를 현재 수신자에게 재전송
@@ -289,16 +289,9 @@ http://localhost:3000/newsletter
 
 예약 발송은 서버가 실행 중일 때 처리됩니다. 서버가 내려가 있으면 다음 실행 시점에 미처리 예약을 다시 확인합니다. 반복 예약은 성공하면 다음 시각으로 넘어가고, 실패하면 상태를 남기고 멈춥니다. 필요하면 반복 예약을 일시정지했다가 나중에 재개할 수 있습니다. 검색 결과가 없는 회차는 실패 대신 `건너뜀`으로 남기고 다음 회차로 이동합니다. 최근 예약 실행 이력도 따로 남아서 어떤 예약이 언제 성공/건너뜀/실패했는지 바로 확인할 수 있습니다. 전체 결과 예약에서 저장된 검색 preset을 고르면, 이후 발송 때마다 그 preset의 최신 조건을 다시 반영합니다. `새로 발견된 법안만 발송`을 켜면 같은 예약에서 이미 발송했던 법안은 제외합니다. 같은 시각과 조건으로 이미 예약된 작업이 있으면 중복 생성 대신 기존 예약을 수정하거나 재개하도록 안내합니다. 대기 중, 일시정지, 실패 상태의 예약은 시각과 반복 주기를 바로 수정할 수 있습니다.
 
-이메일 발송을 사용하려면 `.env`에 SMTP 설정을 추가하세요:
+현재 기본 화면은 이메일 발송 없이 HTML 미리보기와 Markdown/HWPX 저장 중심으로 동작합니다. 그래서 기본 사용에는 SMTP 설정이 필요하지 않습니다.
 
 ```env
-NEWSLETTER_SMTP_HOST=smtp.example.com
-NEWSLETTER_SMTP_PORT=465
-NEWSLETTER_SMTP_SECURE=true
-NEWSLETTER_SMTP_USER=your-account
-NEWSLETTER_SMTP_PASS=your-password
-NEWSLETTER_SMTP_FROM_EMAIL=no-reply@example.com
-NEWSLETTER_SMTP_FROM_NAME=입법예고 뉴스레터
 NEWSLETTER_DATA_DIR=/absolute/path/to/newsletter-data
 ```
 
@@ -314,10 +307,9 @@ NEWSLETTER_DATA_DIR=/absolute/path/to/newsletter-data
 - 자세한 단계별 설명은 [VERCEL.md](VERCEL.md)를 참고하세요.
 - 배포 전 점검은 `npm run vercel:check`, 환경 변수 목록 확인은 `npm run vercel:env`
 - GitHub Actions 외부 cron 예시는 `examples/github-actions-newsletter-cron.yml`
-- `/newsletter` 화면에서 현재 실행 환경, API 키, 저장소, 이메일 발송 준비 상태와 누락된 환경 변수 이름도 바로 볼 수 있습니다.
-- `/newsletter` 화면의 `Vercel 환경 변수 보기` 버튼으로 복붙용 env 템플릿을 열 수 있고, 현재 주소 기준 `cron` 호출 예시도 같이 볼 수 있습니다.
-- `/newsletter` 화면의 `GitHub Actions cron 보기` 버튼으로 외부 cron 워크플로 YAML도 바로 열 수 있습니다.
-- `/newsletter` 화면의 `Vercel cron 설정 보기` 버튼으로 `vercel.json`용 cron 스니펫 예시도 볼 수 있습니다.
+- `This Serverless Function has crashed` 또는 `FUNCTION_INVOCATION_FAILED`가 보이면 Vercel `Settings -> Build and Deployment -> Node.js Version`이 `20.x` 또는 `22.x`인지 먼저 확인하세요.
+- `/newsletter` 화면에서 현재 실행 환경, API 키, 저장소, 다운로드 준비 상태와 누락된 환경 변수 이름도 바로 볼 수 있습니다.
+- `/newsletter` 화면의 `Vercel 환경 변수 보기` 버튼으로 복붙용 env 템플릿을 열 수 있습니다.
 - `/newsletter` 화면의 `Vercel 배포 점검 보기` 버튼으로 배포 직후 확인 순서를 체크리스트로 바로 열 수 있습니다.
 
 ### CLI에서

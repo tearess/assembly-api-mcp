@@ -8,6 +8,10 @@ import {
   buildMarkdownFilename,
   renderNewsletterMarkdown,
 } from "../../src/newsletter/render-markdown.js";
+import {
+  buildHwpxFilename,
+  renderNewsletterHwpx,
+} from "../../src/newsletter/render-hwpx.js";
 import { type NewsletterDocument } from "../../src/newsletter/types.js";
 
 function createDocument(): NewsletterDocument {
@@ -67,6 +71,11 @@ describe("newsletter/render", () => {
     expect(filename).toBe("legislation-newsletter_인공지능_2026-03-20_2026-04-20.html");
   });
 
+  it("HWPX 파일명을 생성한다", () => {
+    const filename = buildHwpxFilename(createDocument());
+    expect(filename).toBe("legislation-newsletter_인공지능_2026-03-20_2026-04-20.hwpx");
+  });
+
   it("HTML 뉴스레터를 생성한다", () => {
     const html = renderNewsletterHtml(createDocument());
 
@@ -79,6 +88,19 @@ describe("newsletter/render", () => {
     expect(html).toContain("입법예고 진행중 / 소관위 심사");
     expect(html).toContain("마무리");
     expect(html).toContain("관심 법안이 있으면 회신해 주세요.");
+  });
+
+  it("HWPX 뉴스레터 패키지를 생성한다", () => {
+    const hwpx = renderNewsletterHwpx(createDocument());
+
+    expect(hwpx.readUInt32LE(0)).toBe(0x04034b50);
+    expect(hwpx.includes(Buffer.from("application/hwp+zip", "utf-8"))).toBe(true);
+    expect(hwpx.includes(Buffer.from("Contents/content.hpf", "utf-8"))).toBe(true);
+    expect(hwpx.includes(Buffer.from("Contents/header.xml", "utf-8"))).toBe(true);
+    expect(hwpx.includes(Buffer.from("Contents/section0.xml", "utf-8"))).toBe(true);
+    expect(hwpx.includes(Buffer.from("Preview/PrvText.txt", "utf-8"))).toBe(true);
+    expect(hwpx.includes(Buffer.from("인공지능 산업 진흥법 일부개정법률안", "utf-8"))).toBe(true);
+    expect(hwpx.includes(Buffer.from("브리핑 메모", "utf-8"))).toBe(true);
   });
 });
 

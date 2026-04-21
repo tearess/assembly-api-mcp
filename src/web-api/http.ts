@@ -53,3 +53,16 @@ export function sendText(
   });
   res.end(text);
 }
+
+export function sendBinary(
+  res: ServerResponse,
+  statusCode: number,
+  body: Buffer,
+  headers: Record<string, string> = {},
+): void {
+  res.writeHead(statusCode, {
+    "Content-Type": "application/octet-stream",
+    ...headers,
+  });
+  res.end(body);
+}

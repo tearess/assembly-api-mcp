@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   hasFullSmtpConfig,
   loadLocalEnv,
+  loadPackageJson,
   loadVercelConfig,
   maskValue,
   projectRoot,
@@ -12,6 +13,7 @@ import {
 loadLocalEnv();
 
 const vercelConfig = loadVercelConfig();
+const packageJson = loadPackageJson();
 const checks = [];
 
 function addCheck(ok, title, detail) {
@@ -45,6 +47,15 @@ addCheck(hasFile("dist/vercel-handler.js"), "빌드 산출물", hasFile("dist/ve
 addCheck(vercelConfig?.buildCommand === "npm run build", "buildCommand", vercelConfig?.buildCommand
   ? `현재 값: ${vercelConfig.buildCommand}`
   : "buildCommand가 없습니다.");
+
+const configuredNodeEngine = packageJson?.engines?.node;
+addCheck(
+  typeof configuredNodeEngine === "string" && configuredNodeEngine.includes("20"),
+  "Node.js 버전 요구사항",
+  typeof configuredNodeEngine === "string"
+    ? `package.json engines.node=${configuredNodeEngine} (Vercel은 Node 20 이상 권장)`
+    : "package.json engines.node 값이 없습니다. Vercel Project Settings에서 Node.js 20.x 또는 22.x를 권장합니다.",
+);
 
 const indexFunctionDuration = vercelConfig?.functions?.["api/index.js"]?.maxDuration;
 const cronFunctionDuration = vercelConfig?.functions?.["api/cron-newsletter.js"]?.maxDuration;

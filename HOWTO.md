@@ -220,12 +220,10 @@ http://localhost:3000/newsletter
 - 키워드 검색
 - 날짜 선택
 - 검색 결과 보기
-- 이메일 주소 추가
 - HTML 미리보기
 - HTML 저장
 - Markdown 저장
-- 이메일 발송
-- 예약 발송
+- HWPX 저장
 
 ### 6-1. 화면 미리보기
 
@@ -258,9 +256,8 @@ http://localhost:3000/newsletter
 +--------------------------------------------------------------+
 
 +--------------------------------------------------------------+
-| 발송 및 저장                                                   |
-| 이메일 추가 | HTML 미리보기 | HTML 저장 | Markdown 저장       |
-| 이메일 발송 | 예약 발송                                         |
+| 내보내기 및 저장                                                |
+| HTML 미리보기 | HTML 저장 | Markdown 저장 | HWPX 저장         |
 +--------------------------------------------------------------+
 ```
 
@@ -269,7 +266,7 @@ http://localhost:3000/newsletter
 1. 왼쪽 위에서 검색 조건을 넣습니다.
 2. 가운데에서 결과 목록을 봅니다.
 3. 오른쪽에서 선택한 법안 내용을 미리 봅니다.
-4. 아래에서 저장하거나 이메일로 보냅니다.
+4. 아래에서 미리 보거나 파일로 저장합니다.
 
 ### 6-2. HTML 미리보기는 어디 있나요?
 
@@ -280,12 +277,12 @@ http://localhost:3000/newsletter
 - `선택 항목 HTML 미리보기`
 - `전체 결과 HTML 미리보기`
 
-버튼을 누르면 **이메일로 보내질 모양 그대로** 미리 볼 수 있습니다.
+버튼을 누르면 **문서가 어떻게 보일지 그대로** 미리 볼 수 있습니다.
 
 쉽게 말하면:
 
-- 아직 보내기 전에
-- 이메일이 어떻게 보일지
+- 저장하기 전에
+- 문서가 어떻게 보일지
 - 먼저 확인하는 기능입니다.
 
 ### 6-3. 어떤 버튼을 누르면 되나요?
@@ -296,7 +293,7 @@ http://localhost:3000/newsletter
 2. `검색`을 누릅니다.
 3. 보고 싶은 법안을 체크합니다.
 4. `선택 항목 HTML 미리보기`를 누릅니다.
-5. 마음에 들면 `선택 항목 이메일 발송` 또는 `선택 항목 Markdown 저장`을 누릅니다.
+5. 마음에 들면 `선택 항목 Markdown 저장` 또는 `선택 항목 HWPX 저장`을 누릅니다.
 
 전체 검색 결과를 한 번에 보고 싶다면:
 
@@ -304,44 +301,20 @@ http://localhost:3000/newsletter
 2. `검색`을 누릅니다.
 3. 아무것도 체크하지 않아도 됩니다.
 4. `전체 결과 HTML 미리보기`를 누릅니다.
-5. 마음에 들면 `전체 결과 이메일 발송`을 누릅니다.
+5. 마음에 들면 `전체 결과 Markdown 저장` 또는 `전체 결과 HWPX 저장`을 누릅니다.
 
 ---
 
-## 7. 이메일까지 보내고 싶다면
+## 7. 지금 버전은 이메일 설정이 필요 없어요
 
-검색만 하고 저장만 할 거라면 이 부분은 나중에 해도 됩니다.
+현재 기본 화면은 **이메일 발송 없이** 아래 기능에 집중합니다.
 
-하지만 **진짜 이메일 발송**을 하려면 `.env`에 메일 설정을 더 넣어야 합니다.
+- HTML 미리보기
+- HTML 저장
+- Markdown 저장
+- HWPX 저장
 
-아래처럼 채워 주세요.
-
-```env
-NEWSLETTER_SMTP_HOST=smtp.example.com
-NEWSLETTER_SMTP_PORT=465
-NEWSLETTER_SMTP_SECURE=true
-NEWSLETTER_SMTP_USER=your-account
-NEWSLETTER_SMTP_PASS=your-password
-NEWSLETTER_SMTP_FROM_EMAIL=no-reply@example.com
-NEWSLETTER_SMTP_FROM_NAME=입법예고 뉴스레터
-```
-
-설명:
-
-- `NEWSLETTER_SMTP_HOST`: 메일 서버 주소
-- `NEWSLETTER_SMTP_PORT`: 메일 서버 포트 번호
-- `NEWSLETTER_SMTP_SECURE`: 보안 연결 여부
-- `NEWSLETTER_SMTP_USER`: 로그인 아이디
-- `NEWSLETTER_SMTP_PASS`: 로그인 비밀번호
-- `NEWSLETTER_SMTP_FROM_EMAIL`: 보내는 사람 이메일
-- `NEWSLETTER_SMTP_FROM_NAME`: 보내는 사람 이름
-
-주의:
-
-- 이 값들은 사용하는 메일 서비스마다 다릅니다.
-- 회사 메일이나 개인 메일 서비스의 SMTP 정보를 확인해서 넣어야 합니다.
-
-설정을 바꿨다면 서버를 한 번 껐다가 다시 켜세요.
+즉, `.env`에 SMTP 같은 메일 설정을 넣지 않아도 바로 사용할 수 있습니다.
 
 끄는 방법:
 
@@ -485,16 +458,17 @@ MCP_PORT=3001
 http://localhost:3001/newsletter
 ```
 
-### 문제 4. 이메일이 안 보내짐
+### 문제 4. HWPX 파일이 저장되지 않음
 
 뜻:
-SMTP 설정이 비어 있거나 틀렸을 가능성이 큽니다.
+브라우저가 다운로드를 막고 있거나, 선택한 법안이 없을 수 있습니다.
 
 해결:
 
-1. `.env`에서 `NEWSLETTER_SMTP_...` 줄 확인
-2. 메일 서비스에서 준 값과 똑같이 입력했는지 확인
-3. 서버 다시 실행
+1. `선택 항목 HWPX 저장`이면 법안을 1건 이상 체크했는지 확인
+2. `전체 결과 HWPX 저장`이면 검색 결과가 실제로 있는지 확인
+3. 브라우저 주소창 근처에서 다운로드 차단 알림이 없는지 확인
+4. 서버 다시 실행
 
 ---
 
@@ -557,7 +531,8 @@ Ctrl + C
 - 화면 열기
 - 검색
 - 미리보기
-- 즉시 이메일 보내기
+- Markdown 저장
+- HWPX 저장
 
 는 Vercel에서 바로 쓸 수 있습니다.
 
@@ -579,9 +554,8 @@ Ctrl + C
 1. GitHub에 프로젝트를 올립니다.
 2. Vercel에서 그 저장소를 가져옵니다.
 3. `ASSEMBLY_API_KEY`를 환경 변수에 넣습니다.
-4. 이메일 발송을 쓸 거면 SMTP 값도 넣습니다.
-5. 저장 기능까지 안정적으로 쓰려면 `NEWSLETTER_STORAGE_BACKEND=vercel-blob`과 `BLOB_READ_WRITE_TOKEN`도 넣습니다.
-6. 배포 후 `https://내주소/newsletter`로 들어갑니다.
+4. 저장 기능까지 안정적으로 쓰려면 `NEWSLETTER_STORAGE_BACKEND=vercel-blob`과 `BLOB_READ_WRITE_TOKEN`도 넣습니다.
+5. 배포 후 `https://내주소/newsletter`로 들어갑니다.
 
 중요:
 
@@ -591,8 +565,6 @@ Ctrl + C
 
 배포가 끝난 뒤에는 `/newsletter` 화면에서 바로 확인할 수 있는 것도 있습니다.
 
-- `실행 환경 상태`에서 API 키, 저장소, 이메일 발송, cron 보호 준비 상태를 볼 수 있습니다.
+- `실행 환경 상태`에서 API 키, 저장소, 다운로드 준비 상태를 볼 수 있습니다.
 - `Vercel 환경 변수 보기` 버튼으로 넣어야 할 환경 변수 예시를 볼 수 있습니다.
-- `Vercel cron 설정 보기` 버튼으로 `vercel.json`용 cron 예시를 볼 수 있습니다.
-- `GitHub Actions cron 보기` 버튼으로 외부 cron 워크플로 예시를 볼 수 있습니다.
 - `Vercel 배포 점검 보기` 버튼으로 배포 직후 무엇부터 확인해야 하는지 체크리스트를 볼 수 있습니다.

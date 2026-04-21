@@ -12,9 +12,8 @@ export function buildNewsletterRuntimeStatus(
   const apiKeyConfigured = Boolean(env["ASSEMBLY_API_KEY"]?.trim());
   const storageMode = describeNewsletterStorage(env);
   const persistentStorage = isNewsletterStoragePersistent(env);
-  const missingSmtpKeys = getMissingSmtpKeys(env);
-  const smtpConfigured = missingSmtpKeys.length === 0;
-  const cronSecretConfigured = Boolean(env["CRON_SECRET"]?.trim());
+  const smtpConfigured = true;
+  const cronSecretConfigured = true;
 
   const missingEnvKeys = new Set<string>();
   const warnings: string[] = [];
@@ -38,26 +37,7 @@ export function buildNewsletterRuntimeStatus(
     recommendedActions.push("저장 데이터를 유지하려면 NEWSLETTER_STORAGE_BACKEND=vercel-blob 과 BLOB_READ_WRITE_TOKEN을 설정하세요.");
   }
 
-  if (!smtpConfigured) {
-    warnings.push("SMTP 설정이 비어 있어 이메일 실제 발송은 동작하지 않을 수 있습니다.");
-    for (const key of missingSmtpKeys) {
-      missingEnvKeys.add(key);
-    }
-    recommendedActions.push("이메일 발송을 쓰려면 NEWSLETTER_SMTP_HOST, PORT, USER, PASS, FROM_EMAIL을 채우세요.");
-  }
-
-  if (!cronSecretConfigured) {
-    warnings.push("CRON_SECRET이 없어 /cron/newsletter 보호가 약합니다.");
-    missingEnvKeys.add("CRON_SECRET");
-    recommendedActions.push("외부 cron 호출을 보호하려면 CRON_SECRET을 설정하세요.");
-  }
-
-  if (platform === "vercel") {
-    notes.push("예약 발송 자동 실행은 Vercel cron 또는 외부 cron 호출을 별도로 연결해야 합니다.");
-    recommendedActions.push("예약 발송 자동 실행이 필요하면 /cron/newsletter를 Vercel cron 또는 외부 스케줄러로 주기 호출하세요.");
-  } else {
-    notes.push("로컬 HTTP 서버에서는 프로세스가 켜져 있는 동안 예약 발송이 내부 타이머로 처리됩니다.");
-  }
+  notes.push("현재 화면은 HTML 미리보기와 Markdown, HWPX 다운로드 중심으로 동작합니다.");
 
   return {
     asOf: formatNowKst(now),
@@ -74,17 +54,6 @@ export function buildNewsletterRuntimeStatus(
     warnings,
     notes,
   };
-}
-
-function getMissingSmtpKeys(env: NodeJS.ProcessEnv): string[] {
-  const required = [
-    "NEWSLETTER_SMTP_HOST",
-    "NEWSLETTER_SMTP_PORT",
-    "NEWSLETTER_SMTP_USER",
-    "NEWSLETTER_SMTP_PASS",
-    "NEWSLETTER_SMTP_FROM_EMAIL",
-  ];
-  return required.filter((key) => !env[key]?.trim());
 }
 
 function describeStorageLabel(mode: NewsletterRuntimeStatus["storageMode"]): string {

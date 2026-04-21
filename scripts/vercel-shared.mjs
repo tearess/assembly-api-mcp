@@ -21,6 +21,19 @@ export function loadVercelConfig() {
   }
 }
 
+export function loadPackageJson() {
+  const filePath = resolve(projectRoot, "package.json");
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(readFileSync(filePath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
 export function maskValue(value, visible = 2) {
   if (!value) return "(missing)";
   if (value.length <= visible * 2) {

@@ -20,9 +20,8 @@ describe("newsletter/runtime-status", () => {
     expect(status.apiKeyConfigured).toBe(true);
     expect(status.storageMode).toBe("local");
     expect(status.persistentStorage).toBe(true);
-    expect(status.smtpConfigured).toBe(false);
-    expect(status.missingEnvKeys).toContain("NEWSLETTER_SMTP_HOST");
-    expect(status.notes.some((item) => item.includes("내부 타이머"))).toBe(true);
+    expect(status.missingEnvKeys).not.toContain("NEWSLETTER_SMTP_HOST");
+    expect(status.notes.some((item) => item.includes("HWPX"))).toBe(true);
   });
 
   it("Vercel에서 Blob이 없으면 임시 저장 경고를 준다", () => {
@@ -37,31 +36,22 @@ describe("newsletter/runtime-status", () => {
     expect(status.persistentStorage).toBe(false);
     expect(status.missingEnvKeys).toContain("NEWSLETTER_STORAGE_BACKEND");
     expect(status.missingEnvKeys).toContain("BLOB_READ_WRITE_TOKEN");
-    expect(status.missingEnvKeys).toContain("CRON_SECRET");
     expect(status.warnings.some((item) => item.includes("임시 저장"))).toBe(true);
     expect(status.recommendedActions.some((item) => item.includes("vercel-blob"))).toBe(true);
-    expect(status.notes.some((item) => item.includes("외부 cron"))).toBe(true);
+    expect(status.notes.some((item) => item.includes("HWPX"))).toBe(true);
   });
 
-  it("Vercel Blob, SMTP, CRON_SECRET가 있으면 준비 완료 상태가 된다", () => {
+  it("Vercel Blob이 있으면 다운로드 중심 준비 완료 상태가 된다", () => {
     const status = buildNewsletterRuntimeStatus({
       VERCEL: "1",
       ASSEMBLY_API_KEY: "sample",
       BLOB_READ_WRITE_TOKEN: "token",
       NEWSLETTER_STORAGE_BACKEND: "vercel-blob",
-      NEWSLETTER_SMTP_HOST: "smtp.example.com",
-      NEWSLETTER_SMTP_PORT: "465",
-      NEWSLETTER_SMTP_USER: "user",
-      NEWSLETTER_SMTP_PASS: "pass",
-      NEWSLETTER_SMTP_FROM_EMAIL: "sender@example.com",
-      CRON_SECRET: "secret",
     }, new Date("2026-04-21T00:00:00.000Z"));
 
     expect(status.apiKeyConfigured).toBe(true);
     expect(status.storageMode).toBe("vercel-blob");
     expect(status.persistentStorage).toBe(true);
-    expect(status.smtpConfigured).toBe(true);
-    expect(status.cronSecretConfigured).toBe(true);
     expect(status.missingEnvKeys).toHaveLength(0);
     expect(status.warnings).toHaveLength(0);
   });

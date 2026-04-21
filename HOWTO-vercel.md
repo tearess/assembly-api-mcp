@@ -45,8 +45,7 @@ Vercel은 GitHub에 있는 프로젝트를 보고,
 예를 들면:
 
 - 국회 API 키
-- 이메일 보내는 서버 정보
-- 예약 발송 보호용 비밀 문자열
+- 저장 데이터를 유지하는 설정
 
 이런 것들을 적어 두는 곳입니다.
 
@@ -80,8 +79,8 @@ Vercel은 GitHub에 있는 프로젝트를 보고,
 
 1. 먼저 **배포만 성공**시킵니다.
 2. 그다음 **검색이 되는지** 확인합니다.
-3. 그다음 **이메일 발송**을 붙입니다.
-4. 마지막에 **예약 발송**을 붙입니다.
+3. 그다음 **Markdown/HWPX 저장**이 되는지 확인합니다.
+4. 마지막에 **저장 데이터 유지**를 붙입니다.
 
 처음부터 모든 기능을 한 번에 완벽하게 하려고 하면 더 헷갈릴 수 있습니다.
 
@@ -186,25 +185,15 @@ MCP_PROFILE=lite
 - `MCP_PROFILE=lite`
   이 프로젝트에서 권장하는 기본값입니다
 
-### 6-2. 이메일 발송까지 하고 싶다면
+### 6-2. 지금 버전은 SMTP가 필요 없어요
 
-이메일을 실제로 보내고 싶다면 아래 값도 넣어야 합니다.
+현재 기본 화면은 **이메일 발송 없이** 아래 기능 중심으로 동작합니다.
 
-```env
-NEWSLETTER_SMTP_HOST=smtp.example.com
-NEWSLETTER_SMTP_PORT=465
-NEWSLETTER_SMTP_SECURE=true
-NEWSLETTER_SMTP_USER=your-account
-NEWSLETTER_SMTP_PASS=your-password
-NEWSLETTER_SMTP_FROM_EMAIL=no-reply@example.com
-NEWSLETTER_SMTP_FROM_NAME=입법예고 뉴스레터
-```
+- HTML 미리보기
+- Markdown 저장
+- HWPX 저장
 
-쉽게 말하면:
-
-- 어떤 메일 서버를 쓸지
-- 어떤 아이디로 로그인할지
-- 누구 이름으로 보낼지
+그래서 Vercel에 올릴 때도 기본적으로 `NEWSLETTER_SMTP_*` 값을 넣지 않아도 됩니다.
 
 를 적는 것입니다.
 
@@ -262,15 +251,6 @@ MCP_PROFILE=lite
 NEWSLETTER_STORAGE_BACKEND=vercel-blob
 NEWSLETTER_BLOB_PREFIX=newsletter-data
 BLOB_READ_WRITE_TOKEN=여기에_Vercel_Blob_토큰
-NEWSLETTER_SMTP_HOST=smtp.example.com
-NEWSLETTER_SMTP_PORT=465
-NEWSLETTER_SMTP_SECURE=true
-NEWSLETTER_SMTP_USER=your-account
-NEWSLETTER_SMTP_PASS=your-password
-NEWSLETTER_SMTP_FROM_EMAIL=no-reply@example.com
-NEWSLETTER_SMTP_FROM_NAME=입법예고 뉴스레터
-CRON_SECRET=아주_길고_랜덤한_문자열
-NEWSLETTER_CRON_CLAIM_LIMIT=5
 ```
 
 ---
@@ -294,6 +274,29 @@ NEWSLETTER_CRON_CLAIM_LIMIT=5
 ```text
 https://my-assembly-news.vercel.app
 ```
+
+### 7-1. 아주 중요: Node.js 버전도 확인하세요
+
+Vercel에서 함수가 뜨자마자 죽는 경우에는
+`Node.js Version`이 너무 낮은 경우가 있습니다.
+
+이 프로젝트는 **Node 20 이상**을 권장합니다.
+
+확인 방법:
+
+1. Vercel 프로젝트로 들어갑니다
+2. `Settings`
+3. `Build and Deployment`
+4. `Node.js Version`
+5. `20.x` 또는 `22.x` 로 맞춥니다
+6. 다시 배포합니다
+
+만약 화면에 이런 글자가 보인다면:
+
+- `This Serverless Function has crashed`
+- `FUNCTION_INVOCATION_FAILED`
+
+먼저 이 Node.js Version부터 확인하는 것이 좋습니다.
 
 ---
 
@@ -340,43 +343,33 @@ https://내-프로젝트-주소.vercel.app/health
 - 실행 환경
 - API 키
 - 저장소
-- 이메일 발송
-- 예약 보호
+- 다운로드
 
 ### 9-2. 아주 편한 버튼들
 
 이 화면에는 Vercel 배포를 도와주는 버튼도 있습니다.
 
 - `Vercel 환경 변수 보기`
-- `Vercel cron 설정 보기`
-- `GitHub Actions cron 보기`
 - `Vercel 배포 점검 보기`
 
 이 버튼들은:
 
 - 무엇이 빠졌는지 보고
 - 어떤 값을 넣어야 하는지 보고
-- 예약 발송을 어떻게 자동으로 돌릴지 보고
 - 배포 직후 무엇을 확인할지 보는 데 도움을 줍니다
 
 ---
 
-## 10. 이메일 발송이 안 되면 어디를 보면 되나요?
-
-보통은 SMTP 값이 비어 있거나 잘못된 경우가 많습니다.
+## 10. HWPX 저장이 안 되면 어디를 보면 되나요?
 
 먼저 아래를 확인하세요.
 
-1. `NEWSLETTER_SMTP_HOST`
-2. `NEWSLETTER_SMTP_PORT`
-3. `NEWSLETTER_SMTP_USER`
-4. `NEWSLETTER_SMTP_PASS`
-5. `NEWSLETTER_SMTP_FROM_EMAIL`
+1. `/newsletter` 화면이 정상적으로 열리는지
+2. 검색 결과가 1건 이상 있는지
+3. `선택 항목 HWPX 저장`을 눌렀다면 법안을 1건 이상 체크했는지
+4. 브라우저가 다운로드를 막고 있지 않은지
 
-그리고 `/newsletter` 화면에서 `이메일 발송` 카드가
-`준비 완료`인지 확인하세요.
-
-처음에는 꼭 **자기 이메일 1개만 넣고 테스트**해 보는 것이 좋습니다.
+그리고 `/newsletter` 화면에서 `다운로드` 카드가 보이는지 확인하세요.
 
 ---
 
@@ -443,10 +436,9 @@ https://내-프로젝트-주소.vercel.app/cron/newsletter
 1. `ASSEMBLY_API_KEY`만 넣고 먼저 배포
 2. `/newsletter` 화면이 열리는지 확인
 3. 검색이 되는지 확인
-4. 그다음 SMTP 넣기
-5. 자기 이메일로 테스트 발송
+4. Markdown 저장이 되는지 확인
+5. HWPX 저장이 되는지 확인
 6. 그다음 Blob 넣기
-7. 마지막에 예약 발송 자동화 붙이기
 
 이렇게 하면 어디에서 문제가 생겼는지 찾기 쉽습니다.
 
@@ -454,13 +446,24 @@ https://내-프로젝트-주소.vercel.app/cron/newsletter
 
 ## 14. 가장 자주 만나는 문제
 
+### 14-0. `This Serverless Function has crashed` 라고 나와요
+
+가장 먼저 아래를 확인하세요.
+
+1. Vercel `Settings -> Build and Deployment -> Node.js Version`
+2. `20.x` 또는 `22.x` 인지 확인
+3. 저장한 뒤 다시 배포
+4. `ASSEMBLY_API_KEY` 가 Production 환경 변수에 들어 있는지 확인
+
+그다음에도 안 되면 Vercel의 `Logs`에서 최근 에러를 확인하세요.
+
 ### 14-1. 화면은 열리는데 검색이 안 돼요
 
 가장 먼저 `ASSEMBLY_API_KEY`를 확인하세요.
 
-### 14-2. 메일이 안 가요
+### 14-2. HWPX 파일이 안 받아져요
 
-SMTP 값이 비어 있거나 틀렸을 가능성이 큽니다.
+브라우저 다운로드 차단이나 선택 항목 부족일 가능성이 큽니다.
 
 ### 14-3. 저장한 수신자가 사라져요
 

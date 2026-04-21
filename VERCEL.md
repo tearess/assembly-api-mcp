@@ -61,6 +61,24 @@ Vercel에 배포한 직후 바로 되는 기능:
 3. `Project`
 4. GitHub 저장소를 선택합니다.
 
+### 3-2-1. Node.js 버전도 확인하세요
+
+이 프로젝트는 `@vercel/blob`를 포함하고 있어서 **Node 20 이상**을 권장합니다.
+
+Vercel에서 확인 위치:
+
+1. 프로젝트 선택
+2. `Settings`
+3. `Build and Deployment`
+4. `Node.js Version`
+
+권장:
+
+- `20.x`
+- `22.x`
+
+만약 배포 후 `This Serverless Function has crashed` 또는 `FUNCTION_INVOCATION_FAILED`가 보이면 이 값부터 먼저 확인한 뒤 다시 배포하는 것이 좋습니다.
+
 ### 3-3. 환경 변수 넣기
 
 Vercel 프로젝트의 `Settings -> Environment Variables`에서 아래 값을 넣습니다.

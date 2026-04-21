@@ -949,7 +949,7 @@ export function buildNewsletterAppHtml(
     <section class="hero">
       <div class="hero-card">
         <h1>입법예고 뉴스레터 스튜디오</h1>
-        <p>키워드와 기간을 입력하면 관련 입법예고 법안을 정리하고, 같은 결과를 HTML 이메일과 Markdown으로 한 번에 내보낼 수 있습니다.</p>
+        <p>키워드와 기간을 입력하면 관련 입법예고 법안을 정리하고, 같은 결과를 HTML 미리보기와 Markdown, HWPX 파일로 바로 내보낼 수 있습니다.</p>
       </div>
       <aside class="hero-side">
         <div class="mini-stat">
@@ -958,7 +958,7 @@ export function buildNewsletterAppHtml(
         </div>
         <div class="mini-stat">
           <div class="label">현재 모드</div>
-          <div class="value">수동 발송 · 다중 수신자</div>
+          <div class="value">문서 저장 · Markdown/HWPX</div>
         </div>
         <div class="mini-stat">
           <div class="label">접속 경로</div>
@@ -1135,18 +1135,18 @@ export function buildNewsletterAppHtml(
         <section class="composer-card">
           <div class="section-head">
             <div>
-              <h3>발송 및 저장</h3>
-              <div class="subtle">이메일 주소를 여러 개 추가하고, 전체 또는 선택 항목 기준으로 발송/저장할 수 있습니다.</div>
+              <h3>내보내기 및 저장</h3>
+              <div class="subtle">전체 또는 선택 항목 기준으로 HTML, Markdown, HWPX 파일을 저장할 수 있습니다.</div>
             </div>
           </div>
           <div class="runtime-grid" id="runtimeStatusGrid"></div>
           <div class="runtime-notice-list" id="runtimeNoticeList"></div>
-          <div class="summary-grid" id="operationalSummaryGrid"></div>
+          <div class="summary-grid" id="operationalSummaryGrid" hidden></div>
           <div class="saved-preset-actions" style="justify-content: flex-start; margin-top: 12px;">
             <button id="viewVercelChecklistBtn" class="ghost-btn" type="button">Vercel 배포 점검 보기</button>
             <button id="viewVercelEnvBtn" class="ghost-btn" type="button">Vercel 환경 변수 보기</button>
-            <button id="viewVercelCronBtn" class="ghost-btn" type="button">Vercel cron 설정 보기</button>
-            <button id="viewCronWorkflowBtn" class="ghost-btn" type="button">GitHub Actions cron 보기</button>
+            <button id="viewVercelCronBtn" class="ghost-btn" type="button" hidden>Vercel cron 설정 보기</button>
+            <button id="viewCronWorkflowBtn" class="ghost-btn" type="button" hidden>GitHub Actions cron 보기</button>
             <button id="exportSettingsBtn" class="ghost-btn" type="button">설정 백업</button>
             <button id="importSettingsBtn" class="ghost-btn" type="button">설정 복원</button>
           </div>
@@ -1154,7 +1154,7 @@ export function buildNewsletterAppHtml(
           <div class="subtle" style="margin-top: 8px;">
             수신자, 수신자 그룹, 검색 preset, 구독 템플릿을 JSON으로 백업하거나 복원합니다. 예약 발송과 로그는 포함되지 않습니다.
           </div>
-
+          <div hidden>
           <div class="recipient-row">
             <input id="recipientInput" type="email" placeholder="recipient@example.com">
             <button id="addRecipientBtn" class="accent-btn" type="button">이메일 추가</button>
@@ -1176,10 +1176,11 @@ export function buildNewsletterAppHtml(
               <option value="">현재 수신자 목록 스냅샷 사용</option>
             </select>
           </label>
+          </div>
 
           <label>
-            메일 제목
-            <input id="subjectInput" type="text" placeholder="[입법예고 뉴스레터] 키워드 브리핑">
+            문서 제목
+            <input id="subjectInput" type="text" placeholder="[입법예고 브리핑] 키워드 요약">
           </label>
 
           <label>
@@ -1197,11 +1198,15 @@ export function buildNewsletterAppHtml(
             <button id="previewAllBtn" class="ghost-btn" type="button">전체 결과 HTML 미리보기</button>
             <button id="downloadSelectedHtmlBtn" class="ghost-btn" type="button">선택 항목 HTML 저장</button>
             <button id="downloadAllHtmlBtn" class="ghost-btn" type="button">전체 결과 HTML 저장</button>
-            <button id="sendSelectedBtn" class="primary-btn" type="button">선택 항목 이메일 발송</button>
-            <button id="sendAllBtn" class="primary-btn" type="button">전체 결과 이메일 발송</button>
+            <button id="downloadSelectedHwpxBtn" class="ghost-btn" type="button">선택 항목 HWPX 저장</button>
+            <button id="downloadAllHwpxBtn" class="ghost-btn" type="button">전체 결과 HWPX 저장</button>
+            <button id="sendSelectedBtn" class="primary-btn" type="button" hidden>선택 항목 이메일 발송</button>
+            <button id="sendAllBtn" class="primary-btn" type="button" hidden>전체 결과 이메일 발송</button>
             <button id="downloadSelectedBtn" class="accent-btn" type="button">선택 항목 Markdown 저장</button>
             <button id="downloadAllBtn" class="accent-btn" type="button">전체 결과 Markdown 저장</button>
           </div>
+          <div class="status-line" id="composerStatus"></div>
+          <div hidden>
           <div class="schedule-row">
             <label>
               예약 발송 시각
@@ -1260,7 +1265,6 @@ export function buildNewsletterAppHtml(
           <div class="saved-preset-list" id="savedSubscriptionList">
             <span class="subtle">저장된 구독 템플릿이 없습니다.</span>
           </div>
-          <div class="status-line" id="composerStatus"></div>
           <div class="log-list" id="scheduleList">
             <span class="subtle">예약 발송 목록을 불러오는 중입니다.</span>
           </div>
@@ -1320,6 +1324,7 @@ export function buildNewsletterAppHtml(
           <div class="log-list" id="sendLogList">
             <span class="subtle">발송 로그를 불러오는 중입니다.</span>
           </div>
+          </div>
         </section>
       </div>
     </section>
@@ -1329,7 +1334,7 @@ export function buildNewsletterAppHtml(
     <div class="modal-card">
       <div class="modal-head">
         <div>
-          <strong id="previewModalTitle">이메일 HTML 미리보기</strong>
+          <strong id="previewModalTitle">HTML 미리보기</strong>
           <div id="previewModalMeta" class="subtle" style="margin-top: 4px;">선택 항목 또는 전체 결과 기준으로 본문을 확인합니다.</div>
         </div>
         <button id="closeModalBtn" class="danger-btn" type="button">닫기</button>
@@ -1765,6 +1770,14 @@ export function buildNewsletterAppHtml(
       await downloadHtml(true);
     });
 
+    document.getElementById("downloadSelectedHwpxBtn").addEventListener("click", async () => {
+      await downloadHwpx(false);
+    });
+
+    document.getElementById("downloadAllHwpxBtn").addEventListener("click", async () => {
+      await downloadHwpx(true);
+    });
+
     openPreviewDetailBtn.addEventListener("click", async () => {
       const item = state.items.find((entry) => entry.billId === state.previewItemId) || state.items[0];
       if (!item) {
@@ -1808,7 +1821,7 @@ export function buildNewsletterAppHtml(
 
     document.getElementById("closeModalBtn").addEventListener("click", () => {
       previewModal.classList.remove("open");
-      previewModalTitle.textContent = "이메일 HTML 미리보기";
+      previewModalTitle.textContent = "HTML 미리보기";
       previewModalMeta.textContent = "선택 항목 또는 전체 결과 기준으로 본문을 확인합니다.";
       previewFrame.srcdoc = "";
     });
@@ -3338,8 +3351,7 @@ export function buildNewsletterAppHtml(
           createRuntimeCard("실행 환경", "-", "현재 서버 환경을 확인하는 중입니다.", "default"),
           createRuntimeCard("API 키", "-", "열린국회 API 연결 상태를 확인합니다.", "default"),
           createRuntimeCard("저장소", "-", "저장 데이터 보관 방식을 확인합니다.", "default"),
-          createRuntimeCard("이메일 발송", "-", "SMTP 설정 여부를 확인합니다.", "default"),
-          createRuntimeCard("예약 보호", "-", "CRON_SECRET 설정 여부를 확인합니다.", "default"),
+          createRuntimeCard("다운로드", "-", "HTML, Markdown, HWPX 저장 준비 상태를 확인합니다.", "default"),
         ].join("");
         runtimeNoticeList.innerHTML = "";
         return;
@@ -3365,16 +3377,10 @@ export function buildNewsletterAppHtml(
           runtimeStatus.persistentStorage ? "ok" : "warn",
         ),
         createRuntimeCard(
-          "이메일 발송",
-          runtimeStatus.smtpConfigured ? "준비 완료" : "추가 설정 필요",
-          runtimeStatus.smtpConfigured ? "즉시 발송과 재전송을 사용할 수 있습니다." : "NEWSLETTER_SMTP_* 값을 채워야 합니다.",
-          runtimeStatus.smtpConfigured ? "ok" : "warn",
-        ),
-        createRuntimeCard(
-          "예약 보호",
-          runtimeStatus.cronSecretConfigured ? "CRON_SECRET 설정됨" : "보호 설정 필요",
-          runtimeStatus.cronSecretConfigured ? "/cron/newsletter 호출을 인증 헤더로 보호합니다." : "외부 호출 보호를 위해 CRON_SECRET 설정을 권장합니다.",
-          runtimeStatus.cronSecretConfigured ? "ok" : "warn",
+          "다운로드",
+          "준비 완료",
+          "HTML 미리보기와 Markdown, HWPX 저장을 사용할 수 있습니다.",
+          "ok",
         ),
       ].join("");
 
@@ -3830,7 +3836,7 @@ export function buildNewsletterAppHtml(
         }
         openPreviewModal(
           data.html,
-          includeAll ? "전체 결과 이메일 HTML 미리보기" : "선택 항목 이메일 HTML 미리보기",
+          includeAll ? "전체 결과 HTML 미리보기" : "선택 항목 HTML 미리보기",
           includeAll
             ? "현재 검색 조건으로 조회되는 전체 결과 기준 본문입니다."
             : ("선택한 법안 " + state.selectedBillIds.size + "건 기준 본문입니다."),
@@ -3935,7 +3941,7 @@ export function buildNewsletterAppHtml(
     }
 
     function openPreviewModal(html, title, meta) {
-      previewModalTitle.textContent = title || "이메일 HTML 미리보기";
+      previewModalTitle.textContent = title || "HTML 미리보기";
       previewModalMeta.textContent = meta || "선택 항목 또는 전체 결과 기준으로 본문을 확인합니다.";
       previewFrame.srcdoc = html;
       previewModal.classList.add("open");
@@ -4317,6 +4323,27 @@ export function buildNewsletterAppHtml(
         setStatus(composerStatus, "HTML 파일을 생성했습니다.", "success");
       } catch (error) {
         setStatus(composerStatus, error.message || "HTML 생성에 실패했습니다.", "error");
+      }
+    }
+
+    async function downloadHwpx(includeAll) {
+      try {
+        if (!includeAll && state.selectedBillIds.size === 0) {
+          throw new Error("선택 항목 HWPX 저장은 법안을 1건 이상 선택해야 합니다.");
+        }
+        const response = await fetch("/api/newsletter/hwpx", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildNewsletterPayload({ includeAll })),
+        });
+        await downloadResponseFile(
+          response,
+          "legislation-newsletter.hwpx",
+          "HWPX 생성에 실패했습니다.",
+        );
+        setStatus(composerStatus, "HWPX 파일을 생성했습니다.", "success");
+      } catch (error) {
+        setStatus(composerStatus, error.message || "HWPX 생성에 실패했습니다.", "error");
       }
     }
 

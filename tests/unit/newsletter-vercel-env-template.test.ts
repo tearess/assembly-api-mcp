@@ -6,9 +6,6 @@ describe("newsletter/vercel-env-template", () => {
     const result = buildVercelEnvTemplate({
       MCP_PROFILE: "lite",
       NEWSLETTER_BLOB_PREFIX: "custom-newsletter",
-      NEWSLETTER_CRON_CLAIM_LIMIT: "9",
-      NEWSLETTER_SMTP_SECURE: "false",
-      NEWSLETTER_SMTP_FROM_NAME: "정책 뉴스레터",
     }, {
       origin: "https://assembly-news.vercel.app",
     });
@@ -19,11 +16,8 @@ describe("newsletter/vercel-env-template", () => {
     expect(result.template).toContain("NEWSLETTER_STORAGE_BACKEND=vercel-blob");
     expect(result.template).toContain("NEWSLETTER_BLOB_PREFIX=custom-newsletter");
     expect(result.template).toContain("BLOB_READ_WRITE_TOKEN=<YOUR_BLOB_READ_WRITE_TOKEN>");
-    expect(result.template).toContain("NEWSLETTER_CRON_CLAIM_LIMIT=9");
-    expect(result.template).toContain("NEWSLETTER_SMTP_SECURE=false");
-    expect(result.template).toContain("NEWSLETTER_SMTP_FROM_NAME=\"정책 뉴스레터\"");
     expect(result.template).toContain("# Newsletter URL: https://assembly-news.vercel.app/newsletter");
-    expect(result.template).toContain("# Cron URL: https://assembly-news.vercel.app/cron/newsletter");
-    expect(result.template).toContain("# NEWSLETTER_CRON_URL=https://assembly-news.vercel.app/cron/newsletter");
+    expect(result.template).toContain("# Health URL: https://assembly-news.vercel.app/health");
+    expect(result.template).toContain("Markdown/HWPX");
   });
 });

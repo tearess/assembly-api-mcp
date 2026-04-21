@@ -43,6 +43,7 @@ import {
   renderNewsletterMarkdown,
 } from "../newsletter/render-markdown.js";
 import { buildHtmlFilename, renderNewsletterHtml } from "../newsletter/render-html.js";
+import { buildHwpxFilename, renderNewsletterHwpx } from "../newsletter/render-hwpx.js";
 import { parseLegislationSearchQueryFromParams } from "../newsletter/query-url.js";
 import {
   type LegislationSearchQuery,
@@ -51,7 +52,7 @@ import {
   type ScheduledNewsletterRecurrence,
   type SavedSearchPresetQuery,
 } from "../newsletter/types.js";
-import { readJsonBody, sendHtml, sendJson, sendText } from "./http.js";
+import { readJsonBody, sendBinary, sendHtml, sendJson, sendText } from "./http.js";
 import { buildNewsletterAppHtml } from "../web-ui/newsletter-app.js";
 
 export async function handleNewsletterRequest(
@@ -854,6 +855,25 @@ export async function handleNewsletterRequest(
       const markdown = renderNewsletterMarkdown(document);
       const filename = buildMarkdownFilename(document);
       sendText(res, 200, markdown, {
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      });
+    } catch (error: unknown) {
+      sendJson(res, 400, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return true;
+  }
+
+  if (req.method === "POST" && pathname === "/api/newsletter/hwpx") {
+    try {
+      const body = await readRequestBody(req);
+      const payload = normalizeNewsletterContentPayload(body);
+      const document = await buildNewsletterDocumentFromPayload(payload, config);
+      const hwpx = renderNewsletterHwpx(document);
+      const filename = buildHwpxFilename(document);
+      sendBinary(res, 200, hwpx, {
+        "Content-Type": "application/hwp+zip",
         "Content-Disposition": `attachment; filename="${filename}"`,
       });
     } catch (error: unknown) {
